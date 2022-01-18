@@ -1,7 +1,12 @@
 <template>
   <div class="element-animation-panel">
     <div class="element-animation" v-if="handleElement">
-      <Popover trigger="click" v-model:visible="animationPoolVisible" v-if="handleElement.type !== 'chart'">
+      <Popover 
+        trigger="click" 
+        v-model:visible="animationPoolVisible" 
+        v-if="!['chart', 'video'].includes(handleElement.type)"
+        @visibleChange="visible => handlePopoverVisibleChange(visible)"
+      >
         <template #content>
           <div class="animation-pool">
             <div class="pool-type" v-for="type in animations" :key="type.name">
@@ -27,6 +32,7 @@
                 </div>
               </div>
             </div>
+            <div class="mask" v-if="!popoverMaskHide"></div>
           </div>
         </template>
         <Button class="element-animation-btn">
@@ -34,23 +40,11 @@
         </Button>
       </Popover>
       <Button class="element-animation-btn" v-else disabled>
-        <IconEffects style="margin-right: 5px;" /> 图表元素暂不支持动画
+        <IconEffects style="margin-right: 5px;" /> 该元素暂不支持动画
       </Button>
-
-      <div class="duration" v-if="handleElementAnimation">
-        <div style="flex: 4;">持续时间（毫秒）：</div>
-        <InputNumber 
-          :min="100"
-          :max="5000"
-          :step="100"
-          :value="handleElementAnimation.duration" 
-          @change="value => updateElementAnimationDuration(value)" 
-          style="flex: 3;" 
-        />
-      </div>
     </div>
 
-    <div class="tip" v-else><IconClick /> 选中画布中的元素添加动画</div>
+    <div class="tip" v-else><IconClick style="margin-right: 5px;" /> 选中画布中的元素添加动画</div>
     
     <Divider />
 
@@ -78,13 +72,30 @@
         </div>
       </template>
     </Draggable>
+
+    <div class="configs" v-if="handleElementAnimation">
+      <Divider />
+
+      <div class="duration">
+        <div style="flex: 4;">持续时间（毫秒）：</div>
+        <InputNumber 
+          :min="100"
+          :max="5000"
+          :step="100"
+          :value="handleElementAnimation.duration" 
+          @change="value => updateElementAnimationDuration(value)" 
+          style="flex: 3;" 
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, ref } from 'vue'
-import { MutationTypes, useStore } from '@/store'
-import { PPTAnimation, PPTElement, Slide } from '@/types/slides'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
+import { PPTAnimation } from '@/types/slides'
 import { ANIMATIONS } from '@/configs/animation'
 import { ELEMENT_TYPE_ZH } from '@/configs/element'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
@@ -106,10 +117,9 @@ export default defineComponent({
     Draggable,
   },
   setup() {
-    const store = useStore()
-    const handleElement = computed<PPTElement>(() => store.getters.handleElement)
-    const currentSlideAnimations = computed<PPTAnimation[] | null>(() => store.getters.currentSlideAnimations)
-    const currentSlide = computed<Slide>(() => store.getters.currentSlide)
+    const slidesStore = useSlidesStore()
+    const { handleElement, handleElementId } = storeToRefs(useMainStore())
+    const { currentSlide, currentSlideAnimations } = storeToRefs(slidesStore)
 
     const hoverPreviewAnimation = ref('')
     const animationPoolVisible = ref(false)
@@ -139,9 +149,8 @@ export default defineComponent({
 
     // 当前选中元素的入场动画信息
     const handleElementAnimation = computed(() => {
-      if (!handleElement.value) return null
       const animations = currentSlideAnimations.value || []
-      const animation = animations.find(item => item.elId === handleElement.value.id)
+      const animation = animations.find(item => item.elId === handleElementId.value)
       return animation || null
     })
 
@@ -154,7 +163,7 @@ export default defineComponent({
     // 删除元素入场动画
     const deleteAnimation = (elId: string) => {
       const animations = (currentSlideAnimations.value as PPTAnimation[]).filter(item => item.elId !== elId)
-      store.commit(MutationTypes.UPDATE_SLIDE, { animations })
+      slidesStore.updateSlide({ animations })
       addHistorySnapshot()
     }
 
@@ -168,7 +177,7 @@ export default defineComponent({
       animations.splice(oldIndex, 1)
       animations.splice(newIndex, 0, animation)
       
-      store.commit(MutationTypes.UPDATE_SLIDE, { animations })
+      slidesStore.updateSlide({ animations })
       addHistorySnapshot()
     }
 
@@ -194,17 +203,17 @@ export default defineComponent({
       if (!currentSlideAnimations.value) return
 
       const animations = currentSlideAnimations.value.map(item => {
-        if (item.elId === handleElement.value.id) return { ...item, type }
+        if (item.elId === handleElementId.value) return { ...item, type }
         return item
       })
-      store.commit(MutationTypes.UPDATE_SLIDE, { animations })
+      slidesStore.updateSlide({ animations })
       animationPoolVisible.value = false
       addHistorySnapshot()
 
-      const animationItem = currentSlideAnimations.value.find(item => item.elId === handleElement.value.id)
+      const animationItem = currentSlideAnimations.value.find(item => item.elId === handleElementId.value)
       const duration = animationItem?.duration || defaultDuration
 
-      runAnimation(handleElement.value.id, type, duration)
+      runAnimation(handleElementId.value, type, duration)
     }
 
     // 修改元素入场动画持续时间
@@ -213,10 +222,10 @@ export default defineComponent({
       if (duration < 100 || duration > 5000) return
 
       const animations = currentSlideAnimations.value.map(item => {
-        if (item.elId === handleElement.value.id) return { ...item, duration }
+        if (item.elId === handleElementId.value) return { ...item, duration }
         return item
       })
-      store.commit(MutationTypes.UPDATE_SLIDE, { animations })
+      slidesStore.updateSlide({ animations })
       addHistorySnapshot()
     }
 
@@ -228,15 +237,24 @@ export default defineComponent({
       }
       const animations: PPTAnimation[] = currentSlideAnimations.value ? JSON.parse(JSON.stringify(currentSlideAnimations.value)) : []
       animations.push({
-        elId: handleElement.value.id,
+        elId: handleElementId.value,
         type,
         duration: defaultDuration,
       })
-      store.commit(MutationTypes.UPDATE_SLIDE, { animations })
+      slidesStore.updateSlide({ animations })
       animationPoolVisible.value = false
       addHistorySnapshot()
 
-      runAnimation(handleElement.value.id, type, defaultDuration)
+      runAnimation(handleElementId.value, type, defaultDuration)
+    }
+
+    // 动画选择面板打开500ms后再移除遮罩层，否则打开面板后迅速滑入鼠标预览会导致抖动
+    const popoverMaskHide = ref(false)
+    const handlePopoverVisibleChange = (visible: boolean) => {
+      if (visible) {
+        setTimeout(() => popoverMaskHide.value = true, 500)
+      }
+      else popoverMaskHide.value = false
     }
 
     return {
@@ -247,17 +265,29 @@ export default defineComponent({
       hoverPreviewAnimation,
       handleElementAnimation,
       handleElementAnimationName,
+      popoverMaskHide,
       addAnimation,
       deleteAnimation,
       handleDragEnd,
       runAnimation,
       updateElementAnimationDuration,
+      handlePopoverVisibleChange,
     }
   },
 })
 </script>
 
 <style lang="scss" scoped>
+.element-animation-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.element-animation {
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
 .element-animation-btn {
   width: 100%;
 }
@@ -265,12 +295,13 @@ export default defineComponent({
   width: 100%;
   display: flex;
   align-items: center;
-  margin: 10px 0;
 }
 .tip {
-  text-align: center;
+  height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-style: italic;
-  padding-top: 12px;
 }
 .animation-pool {
   width: 400px;
@@ -280,6 +311,15 @@ export default defineComponent({
   font-size: 12px;
   margin-right: -12px;
   padding-right: 12px;
+  position: relative;
+
+  .mask {
+    width: 400px;
+    height: 500px;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
 }
 .type-title {
   width: 100%;
@@ -305,6 +345,13 @@ export default defineComponent({
   background-color: $lightGray;
 }
 
+.animation-sequence {
+  flex: 1;
+  padding-right: 12px;
+  margin-right: -12px;
+
+  @include overflow-overlay();
+}
 .sequence-item {
   height: 36px;
   display: flex;

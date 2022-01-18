@@ -1,6 +1,7 @@
 <template>
   <div class="link-handler" :style="{ top: elementInfo.height * canvasScale + 10 + 'px' }">
-    <a class="link" :href="elementInfo.link" target="_blank">{{elementInfo.link}}</a>
+    <a class="link" v-if="elementInfo.link.type === 'web'" :href="elementInfo.link.target" target="_blank">{{elementInfo.link.target}}</a>
+    <a class="link" v-else>幻灯片页面 {{elementInfo.link.target}}</a>
     <div class="btns">
       <div class="btn" @click="openLinkDialog()">更换</div>
       <Divider type="vertical" />
@@ -10,8 +11,9 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType } from 'vue'
-import { useStore } from '@/store'
+import { defineComponent, PropType } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useMainStore } from '@/store'
 import { PPTElement } from '@/types/slides'
 import useLink from '@/hooks/useLink'
 
@@ -28,8 +30,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
+    const { canvasScale } = storeToRefs(useMainStore())
 
     const { removeLink } = useLink()
 

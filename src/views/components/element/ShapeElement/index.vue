@@ -26,7 +26,7 @@
         @mousedown="$event => handleSelectElement($event)"
         @dblclick="enterEditing()"
       >
-        <SvgWrapper 
+        <svg 
           overflow="visible" 
           :width="elementInfo.width"
           :height="elementInfo.height"
@@ -44,6 +44,7 @@
             :transform="`scale(${elementInfo.width / elementInfo.viewBox}, ${elementInfo.height / elementInfo.viewBox}) translate(0,0) matrix(1,0,0,1,0,0)`"
           >
             <path 
+              class="shape-path"
               vector-effect="non-scaling-stroke" 
               stroke-linecap="butt" 
               stroke-miterlimit="8"
@@ -55,9 +56,9 @@
               :stroke-dasharray="outlineStyle === 'dashed' ? '10 6' : '0 0'" 
             ></path>
           </g>
-        </SvgWrapper>
+        </svg>
 
-        <div class="shape-text" :class="text.align">
+        <div class="shape-text" :class="[text.align, { 'editable': editable }]">
           <ProsemirrorEditor
             v-if="editable"
             :elementId="elementInfo.id"
@@ -82,7 +83,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, PropType, ref, watch } from 'vue'
-import { MutationTypes, useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
 import { PPTShapeElement, ShapeText } from '@/types/slides'
 import { ContextmenuItem } from '@/components/Contextmenu/types'
 import useElementOutline from '@/views/components/element/hooks/useElementOutline'
@@ -113,7 +115,9 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore()
+    const mainStore = useMainStore()
+    const slidesStore = useSlidesStore()
+    const { handleElementId } = storeToRefs(mainStore)
 
     const { addHistorySnapshot } = useHistorySnapshot()
 
@@ -138,15 +142,14 @@ export default defineComponent({
 
     const enterEditing = () => {
       editable.value = true
-      store.commit(MutationTypes.SET_EDITING_SHAPE_ELEMENT_ID, props.elementInfo.id)
+      mainStore.setEditingShapeElementId(props.elementInfo.id)
     }
 
     const exitEditing = () => {
       editable.value = false
-      store.commit(MutationTypes.SET_EDITING_SHAPE_ELEMENT_ID, '')
+      mainStore.setEditingShapeElementId('')
     }
     
-    const handleElementId = computed(() => store.state.handleElementId)
     watch(handleElementId, () => {
       if (handleElementId.value !== props.elementInfo.id) {
         if (editable.value) exitEditing()
@@ -167,7 +170,7 @@ export default defineComponent({
 
     const updateText = (content: string) => {
       const _text = { ...text.value, content }
-      store.commit(MutationTypes.UPDATE_ELEMENT, {
+      slidesStore.updateElement({
         id: props.elementInfo.id, 
         props: { text: _text },
       })
@@ -194,6 +197,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .editable-element-shape {
   position: absolute;
+  pointer-events: none;
 
   &.lock .element-content {
     cursor: default;
@@ -213,6 +217,10 @@ export default defineComponent({
     transform-origin: 0 0;
     overflow: visible;
   }
+
+  .shape-path {
+    pointer-events: all;
+  }
 }
 .shape-text {
   position: absolute;
@@ -225,6 +233,11 @@ export default defineComponent({
   padding: 10px;
   line-height: 1.2;
   word-break: break-word;
+  pointer-events: none;
+
+  &.editable {
+    pointer-events: all;
+  }
 
   &.top {
     justify-content: flex-start;

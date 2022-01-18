@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
-import { store, key } from './store'
 
 import '@icon-park/vue-next/styles/index.css'
 import 'prosemirror-view/style/prosemirror.css'
@@ -32,6 +32,7 @@ import {
   Checkbox,
   Drawer,
   Spin,
+  Alert,
 } from 'ant-design-vue'
 
 const app = createApp(App)
@@ -52,6 +53,7 @@ app.component('RadioGroup', Radio.Group)
 app.component('RadioButton', Radio.Button)
 app.component('Input', Input)
 app.component('InputGroup', Input.Group)
+app.component('TextArea', Input.TextArea)
 app.component('Modal', Modal)
 app.component('Dropdown', Dropdown)
 app.component('Menu', Menu)
@@ -59,10 +61,11 @@ app.component('MenuItem', Menu.Item)
 app.component('Checkbox', Checkbox)
 app.component('Drawer', Drawer)
 app.component('Spin', Spin)
+app.component('Alert', Alert)
 
 app.use(Icon)
 app.use(Component)
 app.use(Directive)
 
-app.use(store, key)
+app.use(createPinia())
 app.mount('#app')

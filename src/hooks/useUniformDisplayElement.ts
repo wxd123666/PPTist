@@ -1,6 +1,7 @@
 import { computed } from 'vue'
-import { MutationTypes, useStore } from '@/store'
-import { PPTElement, Slide } from '@/types/slides'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
+import { PPTElement } from '@/types/slides'
 import { getElementRange, getElementListRange, getRectRotatedOffset } from '@/utils/element'
 import useHistorySnapshot from './useHistorySnapshot'
 
@@ -34,10 +35,9 @@ interface LastPos {
 }
 
 export default () => {
-  const store = useStore()
-  const activeElementIdList = computed(() => store.state.activeElementIdList)
-  const activeElementList = computed<PPTElement[]>(() => store.getters.activeElementList)
-  const currentSlide = computed<Slide>(() => store.getters.currentSlide)
+  const slidesStore = useSlidesStore()
+  const { activeElementIdList, activeElementList } = storeToRefs(useMainStore())
+  const { currentSlide } = storeToRefs(slidesStore)
 
   const { addHistorySnapshot } = useHistorySnapshot()
 
@@ -95,7 +95,7 @@ export default () => {
     const span = ((maxX - minX) - totalWidth) / (list.length - 1)
 
     // 按位置顺序依次计算每一个元素的目标位置
-    // 第一项中的元素即为起点，无序计算
+    // 第一项中的元素即为起点，无需计算
     // 从第二项开始，每一项的位置应该为：上一项位置 + 上一项宽度 + 间隔
     // 注意此处计算的位置（pos）并非元素最终的left值，而是目标位置范围最小值（元素旋转后的left值 ≠ 范围最小值）
     const sortedElementData: ElementWithPos[] = []
@@ -154,7 +154,7 @@ export default () => {
       }
     }
 
-    store.commit(MutationTypes.UPDATE_SLIDE, { elements: newElementList })
+    slidesStore.updateSlide({ elements: newElementList })
     addHistorySnapshot()
   }
 
@@ -249,7 +249,7 @@ export default () => {
       }
     }
 
-    store.commit(MutationTypes.UPDATE_SLIDE, { elements: newElementList })
+    slidesStore.updateSlide({ elements: newElementList })
     addHistorySnapshot()
   }
 

@@ -56,12 +56,8 @@ import {
   Github,
   ChartProportion,
   ChartHistogram,
-  ChartHistogramOne,
   ChartLine,
-  ChartLineArea,
-  ChartScatter,
   ChartPie,
-  ChartRing,
   Text,
   Rotate,
   LeftTwo,
@@ -84,6 +80,12 @@ import {
   AlignTextTopOne,
   AlignTextBottomOne,
   AlignTextMiddleOne,
+  Pause,
+  VolumeMute,
+  VolumeNotice,
+  VolumeSmall,
+  VideoTwo,
+  Formula,
 } from '@icon-park/vue-next'
 
 export default {
@@ -95,6 +97,8 @@ export default {
     app.component('IconConnection', Connection)
     app.component('IconChartProportion', ChartProportion)
     app.component('IconInsertTable', InsertTable)
+    app.component('IconVideoTwo', VideoTwo)
+    app.component('IconFormula', Formula)
 
     // 锁定与解锁
     app.component('IconLock', Lock)
@@ -170,12 +174,8 @@ export default {
     
     // 图表
     app.component('IconChartHistogram', ChartHistogram)
-    app.component('IconChartHistogramOne', ChartHistogramOne)
     app.component('IconChartLine', ChartLine)
-    app.component('IconChartLineArea', ChartLineArea)
-    app.component('IconChartScatter', ChartScatter)
     app.component('IconChartPie', ChartPie)
-    app.component('IconChartRing', ChartRing)
 
     // 其他
     app.component('IconPlayOne', PlayOne)
@@ -195,5 +195,11 @@ export default {
     app.component('IconLogout', Logout)
     app.component('IconClear', Clear)
     app.component('IconFolderClose', FolderClose)
+
+    // 视频播放器
+    app.component('IconPause', Pause)
+    app.component('IconVolumeMute', VolumeMute)
+    app.component('IconVolumeNotice', VolumeNotice)
+    app.component('IconVolumeSmall', VolumeSmall)
   }
 }

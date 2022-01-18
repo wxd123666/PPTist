@@ -1,5 +1,5 @@
 <template>
-  <div class="chart-element-operate">
+  <div class="common-element-operate">
     <BorderLine 
       class="operate-border-line"
       v-for="line in borderLines" 
@@ -7,14 +7,21 @@
       :type="line.type" 
       :style="line.style"
     />
-    <template v-if="!elementInfo.lock && (isActiveGroupElement || !isMultiSelect)">
+    <template v-if="handlerVisible">
       <ResizeHandler
         class="operate-resize-handler" 
         v-for="point in resizeHandlers"
         :key="point.direction"
         :type="point.direction"
+        :rotate="elementInfo.rotate"
         :style="point.style"
         @mousedown.stop="$event => scaleElement($event, elementInfo, point.direction)"
+      />
+      <RotateHandler
+        class="operate-rotate-handler" 
+        v-if="!cannotRotate"
+        :style="{ left: scaleWidth / 2 + 'px' }"
+        @mousedown.stop="rotateElement(elementInfo)"
       />
     </template>
   </div>
@@ -22,52 +29,58 @@
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from 'vue'
-import { useStore } from '@/store'
-
-import { PPTShapeElement } from '@/types/slides'
+import { storeToRefs } from 'pinia'
+import { useMainStore } from '@/store'
+import { PPTShapeElement, PPTVideoElement, PPTLatexElement, PPTAudioElement } from '@/types/slides'
 import { OperateResizeHandler } from '@/types/edit'
 import useCommonOperate from '../hooks/useCommonOperate'
 
+import RotateHandler from './RotateHandler.vue'
 import ResizeHandler from './ResizeHandler.vue'
 import BorderLine from './BorderLine.vue'
 
+type PPTElement = PPTShapeElement | PPTVideoElement | PPTLatexElement | PPTAudioElement
+
 export default defineComponent({
-  name: 'chart-element-operate',
+  name: 'common-element-operate',
   inheritAttrs: false,
   components: {
+    RotateHandler,
     ResizeHandler,
     BorderLine,
   },
   props: {
     elementInfo: {
-      type: Object as PropType<PPTShapeElement>,
+      type: Object as PropType<PPTElement>,
       required: true,
     },
-    isActiveGroupElement: {
+    handlerVisible: {
       type: Boolean,
       required: true,
     },
-    isMultiSelect: {
-      type: Boolean,
+    rotateElement: {
+      type: Function as PropType<(element: PPTElement) => void>,
       required: true,
     },
     scaleElement: {
-      type: Function as PropType<(e: MouseEvent, element: PPTShapeElement, command: OperateResizeHandler) => void>,
+      type: Function as PropType<(e: MouseEvent, element: PPTElement, command: OperateResizeHandler) => void>,
       required: true,
     },
   },
   setup(props) {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
+    const { canvasScale } = storeToRefs(useMainStore())
 
     const scaleWidth = computed(() => props.elementInfo.width * canvasScale.value)
     const scaleHeight = computed(() => props.elementInfo.height * canvasScale.value)
     const { resizeHandlers, borderLines } = useCommonOperate(scaleWidth, scaleHeight)
 
+    const cannotRotate = computed(() => ['video', 'audio'].includes(props.elementInfo.type))
+
     return {
       scaleWidth,
       resizeHandlers,
       borderLines,
+      cannotRotate,
     }
   },
 })

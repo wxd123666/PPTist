@@ -126,6 +126,8 @@ table {
   --subThemeColor2: $themeColor;
 
   &.theme {
+    background-color: #fff;
+
     tr:nth-child(2n) .cell {
       background-color: var(--subThemeColor1);
     }

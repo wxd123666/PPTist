@@ -42,6 +42,10 @@
           @update="value => updateContent(value)"
           @mousedown="$event => handleSelectElement($event, false)"
         />
+
+        <!-- 当字号过大且行高较小时，会出现文字高度溢出的情况，导致拖拽区域无法被选中，因此添加了以下节点避免该情况 -->
+        <div class="drag-handler top"></div>
+        <div class="drag-handler bottom"></div>
       </div>
     </div>
   </div>
@@ -49,7 +53,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
-import { MutationTypes, useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
 import { PPTTextElement } from '@/types/slides'
 import { ContextmenuItem } from '@/components/Contextmenu/types'
 import useElementShadow from '@/views/components/element/hooks/useElementShadow'
@@ -78,15 +83,16 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore()
+    const mainStore = useMainStore()
+    const slidesStore = useSlidesStore()
+    const { handleElementId, isScaling } = storeToRefs(mainStore)
+    
     const { addHistorySnapshot } = useHistorySnapshot()
 
     const elementRef = ref<HTMLElement>()
 
     const shadow = computed(() => props.elementInfo.shadow)
     const { shadowStyle } = useElementShadow(shadow)
-
-    const handleElementId = computed(() => store.state.handleElementId)
 
     const handleSelectElement = (e: MouseEvent, canMove = true) => {
       if (props.elementInfo.lock) return
@@ -99,13 +105,11 @@ export default defineComponent({
     // 如果高度变化时正处在缩放操作中，则等待缩放操作结束后再更新
     const realHeightCache = ref(-1)
 
-    const isScaling = computed(() => store.state.isScaling)
-
     watch(isScaling, () => {
       if (handleElementId.value !== props.elementInfo.id) return
 
       if (!isScaling.value && realHeightCache.value !== -1) {
-        store.commit(MutationTypes.UPDATE_ELEMENT, {
+        slidesStore.updateElement({
           id: props.elementInfo.id,
           props: { height: realHeightCache.value },
         })
@@ -121,7 +125,7 @@ export default defineComponent({
 
       if (props.elementInfo.height !== realHeight) {
         if (!isScaling.value) {
-          store.commit(MutationTypes.UPDATE_ELEMENT, {
+          slidesStore.updateElement({
             id: props.elementInfo.id,
             props: { height: realHeight },
           })
@@ -139,8 +143,8 @@ export default defineComponent({
     })
 
     const updateContent = (content: string) => {
-      store.commit(MutationTypes.UPDATE_ELEMENT, {
-        id: props.elementInfo.id, 
+      slidesStore.updateElement({
+        id: props.elementInfo.id,
         props: { content },
       })
       
@@ -178,6 +182,19 @@ export default defineComponent({
 
   .text {
     position: relative;
+  }
+}
+.drag-handler {
+  height: 10px;
+  position: absolute;
+  left: 0;
+  right: 0;
+
+  &.top {
+    top: 0;
+  }
+  &.bottom {
+    bottom: 0;
   }
 }
 </style>

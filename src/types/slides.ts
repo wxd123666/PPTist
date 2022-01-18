@@ -7,6 +7,9 @@ export const enum ElementTypes {
   LINE = 'line',
   CHART = 'chart',
   TABLE = 'table',
+  LATEX = 'latex',
+  VIDEO = 'video',
+  AUDIO = 'audio',
 }
 
 /**
@@ -42,6 +45,18 @@ export interface PPTElementOutline {
   color?: string;
 }
 
+/**
+ * 元素超链接
+ * 
+ * type: 链接类型（网页、幻灯片页面）
+ * 
+ * target: 目标地址（网页链接、幻灯片页面ID）
+ */
+export interface PPTElementLink {
+  type: 'web' | 'slide';
+  target: string;
+}
+
 
 /**
  * 元素通用属性
@@ -60,7 +75,9 @@ export interface PPTElementOutline {
  * 
  * height: 元素高度
  * 
- * link?: 超链接地址
+ * rotate: 旋转角度
+ * 
+ * link?: 超链接
  */
 interface PPTBaseElement {
   id: string;
@@ -70,7 +87,8 @@ interface PPTBaseElement {
   groupId?: string;
   width: number;
   height: number;
-  link?: string;
+  rotate: number;
+  link?: PPTElementLink;
 }
 
 
@@ -80,8 +98,6 @@ interface PPTBaseElement {
  * type: 元素类型（text）
  * 
  * content: 文本内容（HTML字符串）
- * 
- * rotate: 旋转角度
  * 
  * defaultFontName: 默认字体（会被文本内容中的HTML内联样式覆盖）
  * 
@@ -102,7 +118,6 @@ interface PPTBaseElement {
 export interface PPTTextElement extends PPTBaseElement {
   type: 'text';
   content: string;
-  rotate: number;
   defaultFontName: string;
   defaultColor: string;
   outline?: PPTElementOutline;
@@ -176,8 +191,6 @@ export interface ImageElementClip {
  * 
  * src: 图片地址
  * 
- * rotate: 旋转角度
- * 
  * outline?: 边框
  * 
  * filters?: 图片滤镜
@@ -194,7 +207,6 @@ export interface PPTImageElement extends PPTBaseElement {
   type: 'image';
   fixedRatio: boolean;
   src: string;
-  rotate: number;
   outline?: PPTElementOutline;
   filters?: ImageElementFilters;
   clip?: ImageElementClip;
@@ -252,8 +264,6 @@ export interface ShapeText {
  * 
  * gradient?: 渐变，该属性存在时将优先作为填充
  * 
- * rotate: 旋转角度
- * 
  * outline?: 边框
  * 
  * opacity?: 不透明度
@@ -275,7 +285,6 @@ export interface PPTShapeElement extends PPTBaseElement {
   fixedRatio: boolean;
   fill: string;
   gradient?: ShapeGradient;
-  rotate: number;
   outline?: PPTElementOutline;
   opacity?: number;
   flipH?: boolean;
@@ -309,7 +318,7 @@ export type LinePoint = '' | 'arrow' | 'dot'
  * 
  * curve?: 曲线中点位置（[x, y]）
  */
-export interface PPTLineElement extends Omit<PPTBaseElement, 'height'> {
+export interface PPTLineElement extends Omit<PPTBaseElement, 'height' | 'rotate'> {
   type: 'line';
   start: [number, number];
   end: [number, number];
@@ -325,6 +334,7 @@ export interface PPTLineElement extends Omit<PPTBaseElement, 'height'> {
 export type ChartType = 'bar' | 'line' | 'pie'
 export interface ChartData {
   labels: string[];
+  legends: string[];
   series: number[][];
 }
 
@@ -346,6 +356,8 @@ export interface ChartData {
  * themeColor: 主题色
  * 
  * gridColor?: 网格&坐标颜色
+ * 
+ * legend?: 图例/位置
  */
 export interface PPTChartElement extends PPTBaseElement {
   type: 'chart';
@@ -354,8 +366,9 @@ export interface PPTChartElement extends PPTBaseElement {
   data: ChartData;
   options?: ILineChartOptions & IBarChartOptions & IPieChartOptions;
   outline?: PPTElementOutline;
-  themeColor: string;
+  themeColor: string[];
   gridColor?: string;
+  legend?: '' | 'top' | 'bottom',
 }
 
 
@@ -457,7 +470,74 @@ export interface PPTTableElement extends PPTBaseElement {
 }
 
 
-export type PPTElement = PPTTextElement | PPTImageElement | PPTShapeElement | PPTLineElement | PPTChartElement | PPTTableElement
+/**
+ * LaTeX元素（公式）
+ * 
+ * type: 元素类型（latex）
+ * 
+ * latex: latex代码
+ * 
+ * path: svg path
+ * 
+ * color: 颜色
+ * 
+ * strokeWidth: 路径宽度
+ * 
+ * viewBox: SVG的viewBox属性
+ * 
+ * fixedRatio: 固定形状宽高比例
+ */
+export interface PPTLatexElement extends PPTBaseElement {
+  type: 'latex';
+  latex: string;
+  path: string;
+  color: string;
+  strokeWidth: number;
+  viewBox: [number, number];
+  fixedRatio: boolean;
+}
+
+/**
+ * 视频元素
+ * 
+ * type: 元素类型（video）
+ * 
+ * src: 视频地址
+ * 
+ * poster: 预览封面
+ */
+export interface PPTVideoElement extends PPTBaseElement {
+  type: 'video';
+  src: string;
+  poster?: string;
+}
+
+/**
+ * 音频元素
+ * 
+ * type: 元素类型（audio）
+ * 
+ * fixedRatio: 固定图标宽高比例
+ * 
+ * color: 图标颜色
+ * 
+ * loop: 循环播放
+ * 
+ * autoplay: 自动播放
+ * 
+ * src: 音频地址
+ */
+export interface PPTAudioElement extends PPTBaseElement {
+  type: 'audio';
+  fixedRatio: boolean;
+  color: string,
+  loop: boolean,
+  autoplay: boolean,
+  src: string;
+}
+
+
+export type PPTElement = PPTTextElement | PPTImageElement | PPTShapeElement | PPTLineElement | PPTChartElement | PPTTableElement | PPTLatexElement | PPTVideoElement | PPTAudioElement
 
 
 /**
@@ -502,6 +582,9 @@ export interface SlideBackground {
   gradientRotate?: number;
 }
 
+
+export type TurningMode = 'no' | 'fade' | 'slideX' | 'slideY'
+
 /**
  * 幻灯片页面
  * 
@@ -523,7 +606,7 @@ export interface Slide {
   remark?: string;
   background?: SlideBackground;
   animations?: PPTAnimation[];
-  turningMode?: 'no' | 'fade' | 'slideX' | 'slideY';
+  turningMode?: TurningMode;
 }
 
 /**

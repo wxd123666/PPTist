@@ -1,5 +1,5 @@
-import { computed } from 'vue'
-import { MutationTypes, useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
 import { createRandomCode } from '@/utils/common'
 import { getImageSize } from '@/utils/image'
 import { VIEWPORT_SIZE } from '@/configs/canvas'
@@ -23,24 +23,22 @@ interface LineElementPosition {
 }
 
 export default () => {
-  const store = useStore()
-  const themeColor = computed(() => store.state.theme.themeColor)
-  const fontColor = computed(() => store.state.theme.fontColor)
-  const fontName = computed(() => store.state.theme.fontName)
-  const viewportRatio = computed(() => store.state.viewportRatio)
-  const creatingElement = computed(() => store.state.creatingElement)
+  const mainStore = useMainStore()
+  const slidesStore = useSlidesStore()
+  const { creatingElement } = storeToRefs(mainStore)
+  const { theme, viewportRatio } = storeToRefs(slidesStore)
 
   const { addHistorySnapshot } = useHistorySnapshot()
 
   // 创建（插入）一个元素并将其设置为被选中元素
   const createElement = (element: PPTElement) => {
-    store.commit(MutationTypes.ADD_ELEMENT, element)
-    store.commit(MutationTypes.SET_ACTIVE_ELEMENT_ID_LIST, [element.id])
+    slidesStore.addElement(element)
+    mainStore.setActiveElementIdList([element.id])
 
-    if (creatingElement.value) store.commit(MutationTypes.SET_CREATING_ELEMENT, null)
+    if (creatingElement.value) mainStore.setCreatingElement(null)
 
     setTimeout(() => {
-      store.commit(MutationTypes.SET_EDITORAREA_FOCUS, true)
+      mainStore.setEditorareaFocus(true)
     }, 0)
 
     addHistorySnapshot()
@@ -90,10 +88,12 @@ export default () => {
       top: 81.25,
       width: 400,
       height: 400,
-      themeColor: themeColor.value,
-      gridColor: fontColor.value,
+      rotate: 0,
+      themeColor: [theme.value.themeColor],
+      gridColor: theme.value.fontColor,
       data: {
         labels: ['类别1', '类别2', '类别3', '类别4', '类别5'],
+        legends: ['系列1'],
         series: [
           [12, 19, 5, 2, 18],
         ],
@@ -108,8 +108,8 @@ export default () => {
    */
   const createTableElement = (row: number, col: number) => {
     const style: TableCellStyle = {
-      fontname: fontName.value,
-      color: fontColor.value,
+      fontname: theme.value.fontName,
+      color: theme.value.fontColor,
     }
     const data: TableCell[][] = []
     for (let i = 0; i < row; i++) {
@@ -134,6 +134,7 @@ export default () => {
       width,
       height,
       colWidths,
+      rotate: 0,
       data,
       left: (VIEWPORT_SIZE - width) / 2,
       top: (VIEWPORT_SIZE * viewportRatio.value - height) / 2,
@@ -143,7 +144,7 @@ export default () => {
         color: '#eeece1',
       },
       theme: {
-        color: themeColor.value,
+        color: theme.value.themeColor,
         rowHeader: true,
         rowFooter: false,
         colHeader: false,
@@ -168,8 +169,8 @@ export default () => {
       height,
       content,
       rotate: 0,
-      defaultFontName: fontName.value,
-      defaultColor: fontColor.value,
+      defaultFontName: theme.value.fontName,
+      defaultColor: theme.value.fontColor,
     })
   }
   
@@ -189,7 +190,7 @@ export default () => {
       height,
       viewBox: data.viewBox,
       path: data.path,
-      fill: themeColor.value,
+      fill: theme.value.themeColor,
       fixedRatio: false,
       rotate: 0,
     }
@@ -213,13 +214,73 @@ export default () => {
       start,
       end,
       points: data.points,
-      color: themeColor.value,
+      color: theme.value.themeColor,
       style: data.style,
       width: 2,
     }
     if (data.isBroken) newElement.broken = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
     if (data.isCurve) newElement.curve = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
     createElement(newElement)
+  }
+  
+  /**
+   * 创建LaTeX元素
+   * @param svg SVG代码
+   */
+  const createLatexElement = (data: { path: string; latex: string; w: number; h: number; }) => {
+    createElement({
+      type: 'latex',
+      id: createRandomCode(),
+      width: data.w,
+      height: data.h,
+      rotate: 0,
+      left: (VIEWPORT_SIZE - data.w) / 2,
+      top: (VIEWPORT_SIZE * viewportRatio.value - data.h) / 2,
+      path: data.path,
+      latex: data.latex,
+      color: theme.value.fontColor,
+      strokeWidth: 2,
+      viewBox: [data.w, data.h],
+      fixedRatio: true,
+    })
+  }
+  
+  /**
+   * 创建视频元素
+   * @param src 视频地址
+   */
+  const createVideoElement = (src: string) => {
+    createElement({
+      type: 'video',
+      id: createRandomCode(),
+      width: 500,
+      height: 300,
+      rotate: 0,
+      left: (VIEWPORT_SIZE - 500) / 2,
+      top: (VIEWPORT_SIZE * viewportRatio.value - 300) / 2,
+      src,
+    })
+  }
+  
+  /**
+   * 创建音频元素
+   * @param src 音频地址
+   */
+  const createAudioElement = (src: string) => {
+    createElement({
+      type: 'audio',
+      id: createRandomCode(),
+      width: 50,
+      height: 50,
+      rotate: 0,
+      left: (VIEWPORT_SIZE - 50) / 2,
+      top: (VIEWPORT_SIZE * viewportRatio.value - 50) / 2,
+      loop: false,
+      autoplay: false,
+      fixedRatio: true,
+      color: theme.value.themeColor,
+      src,
+    })
   }
 
   return {
@@ -229,5 +290,8 @@ export default () => {
     createTextElement,
     createShapeElement,
     createLineElement,
+    createLatexElement,
+    createVideoElement,
+    createAudioElement,
   }
 }

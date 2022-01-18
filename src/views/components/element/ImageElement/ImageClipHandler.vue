@@ -39,13 +39,13 @@
         :key="point" 
         @mousedown.stop="$event => scaleClipRange($event, point)"
       >
-        <SvgWrapper width="16" height="16" fill="#fff" stroke="#333">
+        <svg width="16" height="16" fill="#fff" stroke="#333">
           <path
             stroke-width="0.3" 
             shape-rendering="crispEdges"
             d="M 16 0 L 0 0 L 0 16 L 4 16 L 4 4 L 16 4 L 16 0 Z"
           ></path>
-        </SvgWrapper>
+        </svg>
       </div>
       <div 
         :class="['clip-point', '', point]" 
@@ -53,13 +53,13 @@
         :key="point" 
         @mousedown.stop="$event => scaleClipRange($event, point)"
       >
-        <SvgWrapper width="16" height="16" fill="#fff" stroke="#333">
+        <svg width="16" height="16" fill="#fff" stroke="#333">
           <path
             stroke-width="0.3" 
             shape-rendering="crispEdges"
             d="M 16 0 L 0 0 L 0 4 L 16 4 Z"
           ></path>
-        </SvgWrapper>
+        </svg>
       </div>
     </div>
   </div>
@@ -67,7 +67,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, onUnmounted, PropType, reactive, ref } from 'vue'
-import { useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useKeyboardStore } from '@/store'
 import { KEYS } from '@/configs/hotkey'
 import { ImageClipData, ImageClipDataRange, ImageClipedEmitData } from '@/types/edit'
 
@@ -106,9 +107,8 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
-    const ctrlOrShiftKeyActive = computed<boolean>(() => store.getters.ctrlOrShiftKeyActive)
+    const { canvasScale } = storeToRefs(useMainStore())
+    const { ctrlOrShiftKeyActive } = storeToRefs(useKeyboardStore())
 
     const clipWrapperPositionStyle = reactive({
       top: '0',

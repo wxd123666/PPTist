@@ -1,18 +1,18 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { trim } from 'lodash'
 import { saveAs } from 'file-saver'
 import pptxgen from 'pptxgenjs'
 import tinycolor from 'tinycolor2'
+import { useSlidesStore } from '@/store'
 import { getElementRange, getLineElementPath, getTableSubThemeColor } from '@/utils/element'
 import { AST, toAST } from '@/utils/htmlParser'
 import { SvgPoints, toPoints } from '@/utils/svgPathParser'
 import { svg2Base64 } from '@/utils/svg2Base64'
-import { useStore } from '@/store'
 import { message } from 'ant-design-vue'
 
 export default () => {
-  const store = useStore()
-  const slides = computed(() => store.state.slides)
+  const { slides } = storeToRefs(useSlidesStore())
 
   const exporting = ref(false)
   
@@ -247,7 +247,6 @@ export default () => {
               angle: 45,
             }
           }
-          if (el.link) options.hyperlink = { url: el.link }
 
           pptxSlide.addText(textProps, options)
         }
@@ -264,7 +263,14 @@ export default () => {
           if (el.flipV) options.flipV = el.flipV
           if (el.rotate) options.rotate = el.rotate
           if (el.clip && el.clip.shape === 'ellipse') options.rounding = true
-          if (el.link) options.hyperlink = { url: el.link }
+          if (el.link) {
+            const { type, target } = el.link
+            if (type === 'web') options.hyperlink = { url: target }
+            else if (type === 'slide') {
+              const index = slides.value.findIndex(slide => slide.id === target)
+              if (index !== -1) options.hyperlink = { slide: index + 1 }
+            }
+          }
 
           pptxSlide.addImage(options)
         }
@@ -282,7 +288,14 @@ export default () => {
               h: el.height / 100,
             }
             if (el.rotate) options.rotate = el.rotate
-            if (el.link) options.hyperlink = { url: el.link }
+            if (el.link) {
+              const { type, target } = el.link
+              if (type === 'web') options.hyperlink = { url: target }
+              else if (type === 'slide') {
+                const index = slides.value.findIndex(slide => slide.id === target)
+                if (index !== -1) options.hyperlink = { slide: index + 1 }
+              }
+            }
 
             pptxSlide.addImage(options)
           }
@@ -324,7 +337,14 @@ export default () => {
                 angle: 45,
               }
             }
-            if (el.link) options.hyperlink = { url: el.link }
+            if (el.link) {
+              const { type, target } = el.link
+              if (type === 'web') options.hyperlink = { url: target }
+              else if (type === 'slide') {
+                const index = slides.value.findIndex(slide => slide.id === target)
+                if (index !== -1) options.hyperlink = { slide: index + 1 }
+              }
+            }
 
             pptxSlide.addShape('custGeom' as pptxgen.ShapeType, options)
           }
@@ -382,13 +402,29 @@ export default () => {
             })
           }
 
-          const chartColors = tinycolor(el.themeColor).analogous(10).map(item => item.toHexString())
+          let chartColors: string[] = []
+          if (el.themeColor.length === 10) chartColors = el.themeColor.map(color => formatColor(color).color)
+          else if (el.themeColor.length === 1) chartColors = tinycolor(el.themeColor[0]).analogous(10).map(color => formatColor(color.toHexString()).color)
+          else {
+            const len = el.themeColor.length
+            const supplement = tinycolor(el.themeColor[len - 1]).analogous(10 + 1 - len).map(color => color.toHexString())
+            chartColors = [...el.themeColor.slice(0, len - 1), ...supplement].map(color => formatColor(color).color)
+          }
+          
           const options: pptxgen.IChartOpts = {
             x: el.left / 100,
             y: el.top / 100,
             w: el.width / 100,
             h: el.height / 100,
             chartColors: el.chartType === 'pie' ? chartColors : chartColors.slice(0, el.data.series.length),
+          }
+
+          if (el.fill) options.fill = formatColor(el.fill).color
+          if (el.legend) {
+            options.showLegend = true
+            options.legendPos = el.legend === 'top' ? 't' : 'b'
+            options.legendColor = formatColor(el.gridColor || '#000000').color
+            options.legendFontSize = 14 * 0.75
           }
 
           let type = pptx.ChartType.bar
@@ -496,6 +532,7 @@ export default () => {
             h: el.height / 100,
             colW: el.colWidths.map(item => el.width * item / 100),
           }
+          if (el.theme) options.fill = { color: '#ffffff' }
           if (el.outline.width && el.outline.color) {
             options.border = {
               type: el.outline.style === 'solid' ? 'solid' : 'dash',
@@ -505,6 +542,29 @@ export default () => {
           }
 
           pptxSlide.addTable(tableData, options)
+        }
+        
+        else if (el.type === 'latex') {
+          const svgRef = document.querySelector(`.thumbnail-list .base-element-${el.id} svg`) as HTMLElement
+          const base64SVG = svg2Base64(svgRef)
+
+          const options: pptxgen.ImageProps = {
+            data: base64SVG,
+            x: el.left / 100,
+            y: el.top / 100,
+            w: el.width / 100,
+            h: el.height / 100,
+          }
+          if (el.link) {
+            const { type, target } = el.link
+            if (type === 'web') options.hyperlink = { url: target }
+            else if (type === 'slide') {
+              const index = slides.value.findIndex(slide => slide.id === target)
+              if (index !== -1) options.hyperlink = { slide: index + 1 }
+            }
+          }
+
+          pptxSlide.addImage(options)
         }
       }
     }

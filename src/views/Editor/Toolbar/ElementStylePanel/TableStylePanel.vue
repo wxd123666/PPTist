@@ -117,25 +117,19 @@
 
     <div class="row">
       <div style="flex: 2;">行数：</div>
-      <InputNumber 
-        :min="minRowCount"
-        :max="20"
-        v-model:value="rowCount" 
-        @pressEnter="e => setTableRow(e)"
-        @blur="e => setTableRow(e)"
-        style="flex: 3;" 
-      />
+      <div class="set-count" style="flex: 3;">
+        <Button class="btn" :disabled="rowCount <= 1" @click="setTableRow(rowCount - 1)"><IconMinus /></Button>
+        <div class="count-text">{{rowCount}}</div>
+        <Button class="btn" :disabled="rowCount >= 30" @click="setTableRow(rowCount + 1)"><IconPlus /></Button>
+      </div>
     </div>
     <div class="row">
       <div style="flex: 2;">列数：</div>
-      <InputNumber 
-        :min="minColCount"
-        :max="20"
-        v-model:value="colCount" 
-        @pressEnter="e => setTableCol(e)"
-        @blur="e => setTableCol(e)"
-        style="flex: 3;" 
-      />
+      <div class="set-count" style="flex: 3;">
+        <Button class="btn" :disabled="colCount <= 1" @click="setTableCol(colCount - 1)"><IconMinus /></Button>
+        <div class="count-text">{{colCount}}</div>
+        <Button class="btn" :disabled="colCount >= 30" @click="setTableCol(colCount + 1)"><IconPlus /></Button>
+      </div>
     </div>
 
     <Divider />
@@ -193,13 +187,12 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
-import { MutationTypes, useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
 import { PPTTableElement, TableCell, TableCellStyle, TableTheme } from '@/types/slides'
 import { createRandomCode } from '@/utils/common'
 import { WEB_FONTS } from '@/configs/font'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
-
-import { message } from 'ant-design-vue'
 
 import ElementOutline from '../common/ElementOutline.vue'
 import ColorButton from '../common/ColorButton.vue'
@@ -213,12 +206,10 @@ export default defineComponent({
     ColorButton,
   },
   setup() {
-    const store = useStore()
-    const handleElement = computed<PPTTableElement>(() => store.getters.handleElement)
-    const selectedCells = computed(() => store.state.selectedTableCells)
-    const themeColor = computed(() => store.state.theme.themeColor)
+    const slidesStore = useSlidesStore()
+    const { handleElement, handleElementId, selectedTableCells: selectedCells, availableFonts } = storeToRefs(useMainStore())
+    const themeColor = computed(() => slidesStore.theme.themeColor)
     
-    const availableFonts = computed(() => store.state.availableFonts)
     const fontSizeOptions = [
       '12px', '14px', '16px', '18px', '20px', '22px', '24px', '28px', '32px',
     ]
@@ -304,9 +295,16 @@ export default defineComponent({
 
     watch(selectedCells, updateTextAttrState)
 
+    const updateElement = (props: Partial<PPTTableElement>) => {
+      slidesStore.updateElement({ id: handleElementId.value, props })
+      addHistorySnapshot()
+    }
+
     // 设置单元格内容文本样式
     const updateTextAttrs = (textAttrProp: Partial<TableCellStyle>) => {
-      const data: TableCell[][] = JSON.parse(JSON.stringify(handleElement.value.data))
+      const _handleElement = handleElement.value as PPTTableElement
+
+      const data: TableCell[][] = JSON.parse(JSON.stringify(_handleElement.data))
 
       for (let i = 0; i < data.length; i++) {
         for (let j = 0; j < data[i].length; j++) {
@@ -316,19 +314,15 @@ export default defineComponent({
           }
         }
       }
-      const props = { data }
-      store.commit(MutationTypes.UPDATE_ELEMENT, { id: handleElement.value.id, props })
-
-      addHistorySnapshot()
+      updateElement({ data })
       updateTextAttrState()
     }
 
     // 更新表格主题：主题色、标题行、汇总行、第一列、最后一列
     const updateTheme = (themeProp: Partial<TableTheme>) => {
-      const currentTheme = theme.value || {}
-      const props = { theme: { ...currentTheme, ...themeProp } }
-      store.commit(MutationTypes.UPDATE_ELEMENT, { id: handleElement.value.id, props })
-      addHistorySnapshot()
+      if (!theme.value) return
+      const _theme = { ...theme.value, ...themeProp }
+      updateElement({ theme: _theme })
     }
 
     // 开启/关闭表格主题
@@ -343,53 +337,58 @@ export default defineComponent({
             colFooter: false,
           }
         }
-        store.commit(MutationTypes.UPDATE_ELEMENT, { id: handleElement.value.id, props })
+        updateElement(props)
       }
       else {
-        store.commit(MutationTypes.REMOVE_ELEMENT_PROPS, { id: handleElement.value.id, propName: 'theme' })
+        slidesStore.removeElementProps({ id: handleElementId.value, propName: 'theme' })
+        addHistorySnapshot()
       }
-      addHistorySnapshot()
     }
 
-    // 设置表格行数（只能增加）
-    const setTableRow = (e: KeyboardEvent) => {
-      const value = +(e.target as HTMLInputElement).value
-      const rowCount = handleElement.value.data.length
+    // 设置表格行数
+    const setTableRow = (value: number) => {
+      const _handleElement = handleElement.value as PPTTableElement
+      const rowCount = _handleElement.data.length
 
-      if (value === rowCount) return
-      if (value < rowCount) return message.warning('设置行数不能少于当前值')
-
-      const rowCells: TableCell[] = new Array(colCount.value).fill({ id: createRandomCode(), colspan: 1, rowspan: 1, text: '' })
-      const newTableCells: TableCell[][] = new Array(value - rowCount).fill(rowCells)
-
-      const tableCells: TableCell[][] = JSON.parse(JSON.stringify(handleElement.value.data))
-      tableCells.push(...newTableCells)
-
-      const props = { data: tableCells }
-      store.commit(MutationTypes.UPDATE_ELEMENT, { id: handleElement.value.id, props })
-      addHistorySnapshot()
+      if (value > rowCount) {
+        const rowCells: TableCell[] = new Array(colCount.value).fill({ id: createRandomCode(), colspan: 1, rowspan: 1, text: '' })
+        const newTableCells: TableCell[][] = new Array(value - rowCount).fill(rowCells)
+  
+        const tableCells: TableCell[][] = JSON.parse(JSON.stringify(_handleElement.data))
+        tableCells.push(...newTableCells)
+  
+        updateElement({ data: tableCells })
+      }
+      else {
+        const tableCells: TableCell[][] = _handleElement.data.slice(0, value)
+        updateElement({ data: tableCells })
+      }
     }
 
+    // 设置表格列数
+    const setTableCol = (value: number) => {
+      const _handleElement = handleElement.value as PPTTableElement
+      const colCount = _handleElement.data[0].length
 
-    // 设置表格列数（只能增加）
-    const setTableCol = (e: KeyboardEvent) => {
-      const value = +(e.target as HTMLInputElement).value
-      const colCount = handleElement.value.data[0].length
+      let tableCells = _handleElement.data
+      let colSizeList = _handleElement.colWidths.map(item => item * _handleElement.width)
 
-      if (value === colCount) return
-      if (value < colCount) return message.warning('设置列数不能少于当前值')
+      if (value > colCount) {
+        tableCells = tableCells.map(item => {
+          const cells: TableCell[] = new Array(value - colCount).fill({ id: createRandomCode(), colspan: 1, rowspan: 1, text: '' })
+          item.push(...cells)
+          return item
+        })
+  
+        const newColSizeList: number[] = new Array(value - colCount).fill(100)
+        colSizeList.push(...newColSizeList)
+      }
+      else {
+        tableCells = tableCells.map(item => item.slice(0, value))
+        colSizeList = colSizeList.slice(0, value)
+      }
 
-      const tableCells = handleElement.value.data.map(item => {
-        const cells: TableCell[] = new Array(value - colCount).fill({ id: createRandomCode(), colspan: 1, rowspan: 1, text: '' })
-        item.push(...cells)
-        return item
-      })
-
-      const colSizeList = handleElement.value.colWidths.map(item => item * handleElement.value.width)
-      const newColSizeList = new Array(value - colCount).fill(100)
-      colSizeList.push(...newColSizeList)
-
-      const width = handleElement.value.width + 100 * (value - colCount)
+      const width = colSizeList.reduce((a, b) => a + b)
       const colWidths = colSizeList.map(item => item / width)
 
       const props = {
@@ -397,9 +396,7 @@ export default defineComponent({
         data: tableCells,
         colWidths,
       }
-      store.commit(MutationTypes.UPDATE_ELEMENT, { id: handleElement.value.id, props })
-
-      addHistorySnapshot()
+      updateElement(props)
     }
 
     return {
@@ -447,5 +444,20 @@ export default defineComponent({
   width: 16px;
   height: 3px;
   margin-top: 1px;
+}
+.set-count {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .btn {
+    padding: 4px 8px;
+  }
+
+  .count-text {
+    flex: 1;
+    text-align: center;
+    margin: 0 8px;
+  }
 }
 </style>

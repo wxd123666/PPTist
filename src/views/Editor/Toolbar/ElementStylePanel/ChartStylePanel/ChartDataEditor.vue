@@ -23,13 +23,18 @@
       </div>
       <table>
         <tbody>
-          <tr v-for="rowIndex in 30" :key="rowIndex">
-            <td v-for="colIndex in 7" :key="colIndex" :class="{ 'head': colIndex === 1 && rowIndex <= selectedRange[1] }">
+          <tr v-for="rowIndex in 31" :key="rowIndex">
+            <td 
+              v-for="colIndex in 7" 
+              :key="colIndex" 
+              :class="{ 'head': (colIndex === 1 && rowIndex <= selectedRange[1]) || (rowIndex === 1 && colIndex <= selectedRange[0]) }"
+            >
               <input 
                 :class="['item', { 'selected': rowIndex <= selectedRange[1] && colIndex <= selectedRange[0] }]"
                 :id="`cell-${rowIndex - 1}-${colIndex - 1}`"
                 autocomplete="off"
                 @focus="focusCell = [rowIndex - 1, colIndex - 1]"
+                @paste="$event => handlePaste($event, rowIndex - 1, colIndex - 1)"
               >
             </td>
           </tr>
@@ -38,8 +43,13 @@
     </div>
 
     <div class="btns">
-      <Button class="btn" @click="closeEditor()">取消</Button>
-      <Button type="primary" class="btn" @click="getTableData()">确认</Button>
+      <div class="left">
+        <Button class="btn" @click="clear()">清空</Button>
+      </div>
+      <div class="right">
+        <Button class="btn" @click="closeEditor()">取消</Button>
+        <Button type="primary" class="btn" @click="getTableData()" style="margin-left: 10px;">确认</Button>
+      </div>
     </div>
   </div>
 </template>
@@ -48,6 +58,7 @@
 import { computed, defineComponent, onMounted, onUnmounted, PropType, ref } from 'vue'
 import { ChartData } from '@/types/slides'
 import { KEYS } from '@/configs/hotkey'
+import { pasteCustomClipboardString, pasteExcelClipboardString } from '@/utils/clipboard'
 
 const CELL_WIDTH = 100
 const CELL_HEIGHT = 32
@@ -89,10 +100,11 @@ export default defineComponent({
     const initData = () => {
       const _data: string[][] = []
 
-      const { labels, series } = props.data
+      const { labels, legends, series } = props.data
       const rowCount = labels.length
       const colCount = series.length
 
+      _data.push(['', ...legends])
       for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
         const row = [labels[rowIndex]]
         for (let colIndex = 0; colIndex < colCount; colIndex++) {
@@ -101,7 +113,7 @@ export default defineComponent({
         _data.push(row)
       }
 
-      for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+      for (let rowIndex = 0; rowIndex < rowCount + 1; rowIndex++) {
         for (let colIndex = 0; colIndex < colCount + 1; colIndex++) {
           const inputRef = document.querySelector(`#cell-${rowIndex}-${colIndex}`) as HTMLInputElement
           if (!inputRef) continue
@@ -109,7 +121,7 @@ export default defineComponent({
         }
       }
 
-      selectedRange.value = [colCount + 1, rowCount]
+      selectedRange.value = [colCount + 1, rowCount + 1]
     }
 
     onMounted(initData)
@@ -140,19 +152,26 @@ export default defineComponent({
       const [col, row] = selectedRange.value
 
       const labels: string[] = []
+      const legends: string[] = []
       const series: number[][] = []
 
-      // 第一列为系列名，实际数据从第二列开始
-      for (let rowIndex = 0; rowIndex < row; rowIndex++) {
-        let labelsItem = `类别${rowIndex + 1}`
+      // 第一行为系列名，第一列为项目名，实际数据从第二行第二列开始
+      for (let rowIndex = 1; rowIndex < row; rowIndex++) {
+        let labelsItem = `类别${rowIndex}`
         const labelInputRef = document.querySelector(`#cell-${rowIndex}-0`) as HTMLInputElement
         if (labelInputRef && labelInputRef.value) labelsItem = labelInputRef.value
         labels.push(labelsItem)
       }
+      for (let colIndex = 1; colIndex < col; colIndex++) {
+        let legendsItem = `系列${colIndex}`
+        const labelInputRef = document.querySelector(`#cell-0-${colIndex}`) as HTMLInputElement
+        if (labelInputRef && labelInputRef.value) legendsItem = labelInputRef.value
+        legends.push(legendsItem)
+      }
 
       for (let colIndex = 1; colIndex < col; colIndex++) {
         const seriesItem = []
-        for (let rowIndex = 0; rowIndex < row; rowIndex++) {
+        for (let rowIndex = 1; rowIndex < row; rowIndex++) {
           const valueInputRef = document.querySelector(`#cell-${rowIndex}-${colIndex}`) as HTMLInputElement
           let value = 0
           if (valueInputRef && valueInputRef.value && !!(+valueInputRef.value)) {
@@ -162,8 +181,48 @@ export default defineComponent({
         }
         series.push(seriesItem)
       }
-      const data = { labels, series }
-      emit('save', data)
+
+      emit('save', { labels, legends, series })
+    }
+
+    // 清空表格数据
+    const clear = () => {
+      for (let rowIndex = 1; rowIndex < 31; rowIndex++) {
+        for (let colIndex = 1; colIndex < 7; colIndex++) {
+          const inputRef = document.querySelector(`#cell-${rowIndex}-${colIndex}`) as HTMLInputElement
+          if (!inputRef) continue
+          inputRef.value = ''
+        }
+      }
+    }
+
+    // 自定义粘贴事件（尝试读取剪贴板中的表格数据）
+    const handlePaste = (e: ClipboardEvent, rowIndex: number, colIndex: number) => {
+      e.preventDefault()
+
+      if (!e.clipboardData) return
+
+      const clipboardDataFirstItem = e.clipboardData.items[0]
+
+      if (clipboardDataFirstItem && clipboardDataFirstItem.kind === 'string' && clipboardDataFirstItem.type === 'text/plain') {
+        clipboardDataFirstItem.getAsString(text => {
+          const clipboardData = pasteCustomClipboardString(text)
+          if (typeof clipboardData === 'object') return
+ 
+          const excelData = pasteExcelClipboardString(text)
+          if (excelData) {
+            const maxRow = rowIndex + excelData.length
+            const maxCol = colIndex + excelData[0].length
+            for (let i = rowIndex; i < maxRow; i++) {
+              for (let j = colIndex; j < maxCol; j++) {
+                const inputRef = document.querySelector(`#cell-${i}-${j}`) as HTMLInputElement
+                if (!inputRef) continue
+                inputRef.value = excelData[i - rowIndex][j - colIndex]
+              }
+            }
+          }
+        })
+      }
     }
 
     // 关闭图表数据编辑器
@@ -230,6 +289,8 @@ export default defineComponent({
       changeSelectRange,
       getTableData,
       closeEditor,
+      clear,
+      handlePaste,
     }
   },
 })
@@ -346,10 +407,7 @@ table {
 }
 .btns {
   margin-top: 10px;
-  text-align: right;
-
-  .btn {
-    margin-left: 10px;
-  }
+  display: flex;
+  justify-content: space-between;
 }
 </style>

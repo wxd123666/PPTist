@@ -11,15 +11,17 @@
         :key="slide.id"
         @click="turnSlideToIndex(index)"
       >
-        <ThumbnailSlide :slide="slide" :size="150" />
+        <ThumbnailSlide :slide="slide" :size="150" :visible="index < slidesLoadLimit" />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType } from 'vue'
-import { useStore } from '@/store'
+import { defineComponent, PropType } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useSlidesStore } from '@/store'
+import useLoadSlides from '@/hooks/useLoadSlides'
 
 import ThumbnailSlide from '@/views/components/ThumbnailSlide/index.vue'
 
@@ -35,15 +37,16 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const store = useStore()
-    const slides = computed(() => store.state.slides)
-    const slideIndex = computed(() => store.state.slideIndex)
+    const { slides, slideIndex } = storeToRefs(useSlidesStore())
+
+    const { slidesLoadLimit } = useLoadSlides()
 
     const close = () => emit('close')
 
     return {
       slides,
       slideIndex,
+      slidesLoadLimit,
       close,
     }
   },

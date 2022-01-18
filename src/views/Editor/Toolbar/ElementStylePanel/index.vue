@@ -9,8 +9,9 @@
 
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
-import { useStore } from '@/store'
-import { ElementTypes, PPTElement } from '@/types/slides'
+import { storeToRefs } from 'pinia'
+import { useMainStore } from '@/store'
+import { ElementTypes } from '@/types/slides'
 
 import TextStylePanel from './TextStylePanel.vue'
 import ImageStylePanel from './ImageStylePanel.vue'
@@ -18,12 +19,14 @@ import ShapeStylePanel from './ShapeStylePanel.vue'
 import LineStylePanel from './LineStylePanel.vue'
 import ChartStylePanel from './ChartStylePanel/index.vue'
 import TableStylePanel from './TableStylePanel.vue'
+import LatexStylePanel from './LatexStylePanel.vue'
+import VideoStylePanel from './VideoStylePanel.vue'
+import AudioStylePanel from './AudioStylePanel.vue'
 
 export default defineComponent({
   name: 'element-style-panel',
   setup() {
-    const store = useStore()
-    const handleElement = computed<PPTElement>(() => store.getters.handleElement)
+    const { handleElement } = storeToRefs(useMainStore())
 
     const currentPanelComponent = computed(() => {
       if (!handleElement.value) return null
@@ -35,6 +38,9 @@ export default defineComponent({
         [ElementTypes.LINE]: LineStylePanel,
         [ElementTypes.CHART]: ChartStylePanel,
         [ElementTypes.TABLE]: TableStylePanel,
+        [ElementTypes.LATEX]: LatexStylePanel,
+        [ElementTypes.VIDEO]: VideoStylePanel,
+        [ElementTypes.AUDIO]: AudioStylePanel,
       }
       return panelMap[handleElement.value.type] || null
     })

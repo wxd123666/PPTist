@@ -1,5 +1,5 @@
 <template>
-  <SvgWrapper class="grid-lines">
+  <svg class="grid-lines">
     <path 
       :style="{
         transform: `scale(${canvasScale})`,
@@ -10,23 +10,24 @@
       stroke-width="0.3" 
       stroke-dasharray="5"
     ></path>
-  </SvgWrapper>
+  </svg>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from 'vue'
 import tinycolor from 'tinycolor2'
-import { useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
 import { VIEWPORT_SIZE } from '@/configs/canvas'
 import { SlideBackground } from '@/types/slides'
 
 export default defineComponent({
   name: 'grid-lines',
   setup() {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
-    const viewportRatio = computed(() => store.state.viewportRatio)
-    const background = computed<SlideBackground | undefined>(() => store.getters.currentSlide?.background)
+    const { canvasScale } = storeToRefs(useMainStore())
+    const { currentSlide, viewportRatio } = storeToRefs(useSlidesStore())
+
+    const background = computed<SlideBackground | undefined>(() => currentSlide.value?.background)
 
     // 计算网格线的颜色，避免与背景的颜色太接近
     const gridColor = computed(() => {

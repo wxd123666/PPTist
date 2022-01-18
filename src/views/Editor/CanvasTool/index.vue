@@ -53,6 +53,21 @@
           <IconInsertTable class="handler-item" />
         </Tooltip>
       </Popover>
+      <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.5" title="插入公式">
+        <IconFormula class="handler-item" @click="latexEditorVisible = true" />
+      </Tooltip>
+      <Popover trigger="click" v-model:visible="mediaInputVisible">
+        <template #content>
+          <MediaInput 
+            @close="mediaInputVisible = false"
+            @insertVideo="src => { createVideoElement(src); mediaInputVisible = false }"
+            @insertAudio="src => { createAudioElement(src); mediaInputVisible = false }"
+          />
+        </template>
+        <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.5" title="插入音视频">
+          <IconVideoTwo class="handler-item" />
+        </Tooltip>
+      </Popover>
     </div>
 
     <div class="right-handler">
@@ -63,12 +78,26 @@
         <IconFullScreen class="handler-item viewport-size-adaptation" @click="setCanvasPercentage(90)" />
       </Tooltip>
     </div>
+
+    <Modal
+      v-model:visible="latexEditorVisible" 
+      :footer="null" 
+      centered
+      :width="880"
+      destroyOnClose
+    >
+      <LaTeXEditor 
+        @close="latexEditorVisible = false"
+        @update="data => { createLatexElement(data); latexEditorVisible = false }"
+      />
+    </Modal>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from 'vue'
-import { MutationTypes, useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSnapshotStore } from '@/store'
 import { getImageDataURL } from '@/utils/image'
 import { ShapePoolItem } from '@/configs/shapes'
 import { LinePoolItem } from '@/configs/lines'
@@ -80,6 +109,8 @@ import ShapePool from './ShapePool.vue'
 import LinePool from './LinePool.vue'
 import ChartPool from './ChartPool.vue'
 import TableGenerator from './TableGenerator.vue'
+import MediaInput from './MediaInput.vue'
+import LaTeXEditor from '@/components/LaTeXEditor/index.vue'
 
 export default defineComponent({
   name: 'canvas-tool',
@@ -88,19 +119,27 @@ export default defineComponent({
     LinePool,
     ChartPool,
     TableGenerator,
+    MediaInput,
+    LaTeXEditor,
   },
   setup() {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
-    const canUndo = computed(() => store.getters.canUndo)
-    const canRedo = computed(() => store.getters.canRedo)
+    const mainStore = useMainStore()
+    const { canvasScale } = storeToRefs(mainStore)
+    const { canUndo, canRedo } = storeToRefs(useSnapshotStore())
 
     const canvasScalePercentage = computed(() => parseInt(canvasScale.value * 100 + '') + '%')
 
     const { scaleCanvas, setCanvasPercentage } = useScaleCanvas()
     const { redo, undo } = useHistorySnapshot()
 
-    const { createImageElement, createChartElement, createTableElement } = useCreateElement()
+    const {
+      createImageElement,
+      createChartElement,
+      createTableElement,
+      createLatexElement,
+      createVideoElement,
+      createAudioElement,
+    } = useCreateElement()
 
     const insertImageElement = (files: File[]) => {
       const imageFile = files[0]
@@ -112,18 +151,19 @@ export default defineComponent({
     const linePoolVisible = ref(false)
     const chartPoolVisible = ref(false)
     const tableGeneratorVisible = ref(false)
+    const mediaInputVisible = ref(false)
+    const latexEditorVisible = ref(false)
 
     // 绘制文字范围
     const drawText = () => {
-      store.commit(MutationTypes.SET_CREATING_ELEMENT, {
+      mainStore.setCreatingElement({
         type: 'text',
-        data: null,
       })
     }
 
     // 绘制形状范围
     const drawShape = (shape: ShapePoolItem) => {
-      store.commit(MutationTypes.SET_CREATING_ELEMENT, {
+      mainStore.setCreatingElement({
         type: 'shape',
         data: shape,
       })
@@ -132,7 +172,7 @@ export default defineComponent({
 
     // 绘制线条路径
     const drawLine = (line: LinePoolItem) => {
-      store.commit(MutationTypes.SET_CREATING_ELEMENT, {
+      mainStore.setCreatingElement({
         type: 'line',
         data: line,
       })
@@ -152,11 +192,16 @@ export default defineComponent({
       linePoolVisible,
       chartPoolVisible,
       tableGeneratorVisible,
+      mediaInputVisible,
+      latexEditorVisible,
       drawText,
       drawShape,
       drawLine,
       createChartElement,
       createTableElement,
+      createLatexElement,
+      createVideoElement,
+      createAudioElement,
     }
   },
 })

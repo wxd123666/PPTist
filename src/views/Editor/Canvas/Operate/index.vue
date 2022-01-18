@@ -13,8 +13,7 @@
       v-if="isSelected"
       :is="currentOperateComponent"
       :elementInfo="elementInfo"
-      :isActiveGroupElement="isActiveGroupElement"
-      :isMultiSelect="isMultiSelect"
+      :handlerVisible="!elementInfo.lock && (isActiveGroupElement || !isMultiSelect)"
       :rotateElement="rotateElement"
       :scaleElement="scaleElement"
       :dragLineElement="dragLineElement"
@@ -38,16 +37,17 @@
 
 <script lang="ts">
 import { defineComponent, PropType, computed } from 'vue'
-import { useStore } from '@/store'
-import { ElementTypes, PPTElement, Slide } from '@/types/slides'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useSlidesStore } from '@/store'
+import { ElementTypes, PPTElement } from '@/types/slides'
 import { OperateLineHandler, OperateResizeHandler } from '@/types/edit'
 
 import ImageElementOperate from './ImageElementOperate.vue'
 import TextElementOperate from './TextElementOperate.vue'
 import ShapeElementOperate from './ShapeElementOperate.vue'
 import LineElementOperate from './LineElementOperate.vue'
-import ChartElementOperate from './ChartElementOperate.vue'
 import TableElementOperate from './TableElementOperate.vue'
+import CommonElementOperate from './CommonElementOperate.vue'
 import LinkHandler from './LinkHandler.vue'
 
 export default defineComponent({
@@ -94,10 +94,8 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
-    const toolbarState = computed(() => store.state.toolbarState)
-    const currentSlide = computed<Slide>(() => store.getters.currentSlide)
+    const { canvasScale, toolbarState } = storeToRefs(useMainStore())
+    const { currentSlide } = storeToRefs(useSlidesStore())
 
     const currentOperateComponent = computed(() => {
       const elementTypeMap = {
@@ -105,8 +103,11 @@ export default defineComponent({
         [ElementTypes.TEXT]: TextElementOperate,
         [ElementTypes.SHAPE]: ShapeElementOperate,
         [ElementTypes.LINE]: LineElementOperate,
-        [ElementTypes.CHART]: ChartElementOperate,
         [ElementTypes.TABLE]: TableElementOperate,
+        [ElementTypes.CHART]: CommonElementOperate,
+        [ElementTypes.LATEX]: CommonElementOperate,
+        [ElementTypes.VIDEO]: CommonElementOperate,
+        [ElementTypes.AUDIO]: CommonElementOperate,
       }
       return elementTypeMap[props.elementInfo.type] || null
     })

@@ -10,8 +10,9 @@
     <div 
       class="element-content" 
       :style="{ filter: shadowStyle ? `drop-shadow(${shadowStyle})` : '' }"
+      @mousedown="$event => handleSelectElement($event)"
     >
-      <SvgWrapper
+      <svg
         overflow="visible" 
         :width="svgWidth"
         :height="svgHeight"
@@ -35,6 +36,7 @@
           />
         </defs>
 				<path
+          class="line-point"
           :d="path" 
           :stroke="elementInfo.color" 
           :stroke-width="elementInfo.width" 
@@ -52,10 +54,9 @@
           stroke="transparent" 
           stroke-width="20" 
           fill="none" 
-          @mousedown="$event => handleSelectElement($event)"
           v-contextmenu="contextmenus"
         ></path>
-			</SvgWrapper>
+			</svg>
     </div>
   </div>
 </template>
@@ -128,9 +129,12 @@ export default defineComponent({
 <style lang="scss" scoped>
 .editable-element-shape {
   position: absolute;
+  pointer-events: none;
 
-  &.lock .line-path {
-    cursor: default;
+  &.lock {
+    .line-path, .line-point {
+      cursor: default;
+    }
   }
 }
 
@@ -144,7 +148,8 @@ export default defineComponent({
     overflow: visible;
   }
 }
-.line-path {
+.line-path, .line-point {
+  pointer-events: all;
   cursor: move;
 }
 </style>

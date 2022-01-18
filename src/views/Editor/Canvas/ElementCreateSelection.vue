@@ -3,11 +3,12 @@
     class="element-create-selection"
     ref="selectionRef"
     @mousedown.stop="$event => createSelection($event)"
+    @contextmenu.stop.prevent
   >
     <div :class="['selection', creatingElement.type]" v-if="start && end" :style="position">
 
       <!-- 绘制线条专用 -->
-      <SvgWrapper
+      <svg
         v-if="creatingElement.type === 'line' && lineData"
         overflow="visible" 
         :width="lineData.svgWidth"
@@ -22,22 +23,23 @@
           stroke-linejoin 
           stroke-miterlimit 
         ></path>
-			</SvgWrapper>
+			</svg>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
-import { useStore } from '@/store'
+import { storeToRefs } from 'pinia'
+import { useMainStore, useKeyboardStore } from '@/store'
 
 export default defineComponent({
   name: 'element-create-selection',
   emits: ['created'],
   setup(props, { emit }) {
-    const store = useStore()
-    const ctrlOrShiftKeyActive = computed<boolean>(() => store.getters.ctrlOrShiftKeyActive)
-    const creatingElement = computed(() => store.state.creatingElement)
+    const mainStore = useMainStore()
+    const { creatingElement } = storeToRefs(mainStore)
+    const { ctrlOrShiftKeyActive } = storeToRefs(useKeyboardStore())
 
     const start = ref<[number, number]>()
     const end = ref<[number, number]>()
@@ -104,6 +106,12 @@ export default defineComponent({
       document.onmouseup = e => {
         document.onmousemove = null
         document.onmouseup = null
+
+        if (e.button === 2) {
+          setTimeout(() => mainStore.setCreatingElement(null), 0)
+          return
+        }
+
         isMouseDown = false
 
         const endPageX = e.pageX

@@ -7,7 +7,7 @@
       :type="line.type" 
       :style="line.style"
     />
-    <template v-if="!elementInfo.lock && (isActiveGroupElement || !isMultiSelect)">
+    <template v-if="handlerVisible">
       <ResizeHandler
         class="operate-resize-handler" 
         v-for="point in resizeHandlers"
@@ -28,8 +28,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from 'vue'
-import { useStore } from '@/store'
-
+import { storeToRefs } from 'pinia'
+import { useMainStore } from '@/store'
 import { PPTShapeElement } from '@/types/slides'
 import { OperateResizeHandler } from '@/types/edit'
 import useCommonOperate from '../hooks/useCommonOperate'
@@ -51,11 +51,7 @@ export default defineComponent({
       type: Object as PropType<PPTShapeElement>,
       required: true,
     },
-    isActiveGroupElement: {
-      type: Boolean,
-      required: true,
-    },
-    isMultiSelect: {
+    handlerVisible: {
       type: Boolean,
       required: true,
     },
@@ -69,8 +65,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore()
-    const canvasScale = computed(() => store.state.canvasScale)
+    const { canvasScale } = storeToRefs(useMainStore())
 
     const scaleWidth = computed(() => props.elementInfo.width * canvasScale.value)
     const scaleHeight = computed(() => props.elementInfo.height * canvasScale.value)
