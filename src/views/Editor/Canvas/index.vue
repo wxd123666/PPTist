@@ -55,12 +55,12 @@
         :style="{ transform: `scale(${canvasScale})` }"
       >
         <MouseSelection 
-          v-if="mouseSelectionState.isShow"
-          :top="mouseSelectionState.top" 
-          :left="mouseSelectionState.left" 
-          :width="mouseSelectionState.width" 
-          :height="mouseSelectionState.height" 
-          :quadrant="mouseSelectionState.quadrant"
+          v-if="mouseSelectionVisible"
+          :top="mouseSelection.top" 
+          :left="mouseSelection.left" 
+          :width="mouseSelection.width" 
+          :height="mouseSelection.height" 
+          :quadrant="mouseSelectionQuadrant"
         />      
         <EditableElement 
           v-for="(element, index) in elementList" 
@@ -73,6 +73,10 @@
         />
       </div>
     </div>
+
+    <div class="drag-mask" v-if="spaceKeyState"></div>
+
+    <Ruler :viewportStyles="viewportStyles" v-if="showRuler" />
 
     <Modal
       v-model:visible="linkDialogVisible" 
@@ -94,6 +98,7 @@ import { useMainStore, useSlidesStore, useKeyboardStore } from '@/store'
 import { ContextmenuItem } from '@/components/Contextmenu/types'
 import { PPTElement } from '@/types/slides'
 import { AlignmentLineProps } from '@/types/edit'
+import { injectKeySlideScale } from '@/types/injectKey'
 import { removeAllRanges } from '@/utils/selection'
 import { KEYS } from '@/configs/hotkey'
 
@@ -118,6 +123,7 @@ import EditableElement from './EditableElement.vue'
 import MouseSelection from './MouseSelection.vue'
 import ViewportBackground from './ViewportBackground.vue'
 import AlignmentLine from './AlignmentLine.vue'
+import Ruler from './Ruler.vue'
 import ElementCreateSelection from './ElementCreateSelection.vue'
 import MultiSelectOperate from './Operate/MultiSelectOperate.vue'
 import Operate from './Operate/index.vue'
@@ -130,6 +136,7 @@ export default defineComponent({
     MouseSelection,
     ViewportBackground,
     AlignmentLine,
+    Ruler,
     ElementCreateSelection,
     MultiSelectOperate,
     Operate,
@@ -143,11 +150,12 @@ export default defineComponent({
       handleElementId,
       editorAreaFocus,
       showGridLines,
+      showRuler,
       creatingElement,
       canvasScale,
     } = storeToRefs(mainStore)
     const { currentSlide } = storeToRefs(useSlidesStore())
-    const { ctrlKeyState, ctrlOrShiftKeyActive } = storeToRefs(useKeyboardStore())
+    const { ctrlKeyState, spaceKeyState } = storeToRefs(useKeyboardStore())
 
     const viewportRef = ref<HTMLElement>()
     const alignmentLines = ref<AlignmentLineProps[]>([])
@@ -166,11 +174,11 @@ export default defineComponent({
     watchEffect(setLocalElementList)
 
     const canvasRef = ref<HTMLElement>()
-    const { viewportStyles } = useViewportSize(canvasRef)
+    const { dragViewport, viewportStyles } = useViewportSize(canvasRef)
 
     useDropImageOrText(canvasRef)
 
-    const { mouseSelectionState, updateMouseSelection } = useMouseSelection(elementList, viewportRef)
+    const { mouseSelection, mouseSelectionVisible, mouseSelectionQuadrant, updateMouseSelection } = useMouseSelection(elementList, viewportRef)
 
     const { dragElement } = useDragElement(elementList, alignmentLines)
     const { dragLineElement } = useDragLineElement(elementList)
@@ -187,7 +195,10 @@ export default defineComponent({
     // 点击画布的空白区域：清空焦点元素、设置画布焦点、清除文字选区
     const handleClickBlankArea = (e: MouseEvent) => {
       mainStore.setActiveElementIdList([])
-      if (!ctrlOrShiftKeyActive.value) updateMouseSelection(e)
+
+      if (!spaceKeyState.value) updateMouseSelection(e)
+      else dragViewport(e)
+
       if (!editorAreaFocus.value) mainStore.setEditorareaFocus(true)
       removeAllRanges()
     }
@@ -222,6 +233,11 @@ export default defineComponent({
       mainStore.setGridLinesState(!showGridLines.value)
     }
 
+    // 开关标尺
+    const toggleRuler = () => {
+      mainStore.setRulerState(!showRuler.value)
+    }
+
     // 在鼠标绘制的范围插入元素
     const { insertElementFromCreateSelection } = useInsertFromCreateSelection(viewportRef)
 
@@ -243,6 +259,11 @@ export default defineComponent({
           handler: toggleGridLines,
         },
         {
+          text: '标尺',
+          subText: showRuler.value ? '√' : '',
+          handler: toggleRuler,
+        },
+        {
           text: '重置当前页',
           handler: deleteAllElements,
         },
@@ -255,7 +276,7 @@ export default defineComponent({
       ]
     }
 
-    provide('slideScale', canvasScale)
+    provide(injectKeySlideScale, canvasScale)
 
     return {
       elementList,
@@ -266,11 +287,14 @@ export default defineComponent({
       viewportRef,
       viewportStyles,
       canvasScale,
-      mouseSelectionState,
-      currentSlide,
+      mouseSelection,
+      mouseSelectionVisible,
+      mouseSelectionQuadrant,
       creatingElement,
       alignmentLines,
       linkDialogVisible,
+      spaceKeyState,
+      showRuler,
       openLinkDialog,
       handleClickBlankArea,
       removeEditorAreaFocus,
@@ -294,6 +318,10 @@ export default defineComponent({
   overflow: hidden;
   background-color: $lightGray;
   position: relative;
+}
+.drag-mask {
+  cursor: grab;
+  @include absolute-0();
 }
 .viewport-wrapper {
   position: absolute;

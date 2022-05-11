@@ -1,20 +1,28 @@
 <template>
   <div class="writing-board-tool">
-    <teleport to="body">
+    <div class="writing-board-wrap"
+      :style="{
+        width: slideWidth + 'px',
+        height: slideHeight + 'px',
+      }"
+    >
       <WritingBoard 
         ref="writingBoardRef" 
         :color="writingBoardColor" 
         :blackboard="blackboard" 
         :model="writingBoardModel"
       />
-    </teleport>
+    </div>
 
-    <div class="tools">
+    <div class="tools" :style="position">
       <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.3" title="画笔">
-        <div class="btn" :class="{ 'active': writingBoardModel === 'pen' }" @click="changePen()"><IconWrite class="icon" /></div>
+        <div class="btn" :class="{ 'active': writingBoardModel === 'pen' }" @click="changeModel('pen')"><IconWrite class="icon" /></div>
+      </Tooltip>
+      <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.3" title="荧光笔">
+        <div class="btn" :class="{ 'active': writingBoardModel === 'mark' }" @click="changeModel('mark')"><IconHighLight class="icon" /></div>
       </Tooltip>
       <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.3" title="橡皮擦">
-        <div class="btn" :class="{ 'active': writingBoardModel === 'eraser' }" @click="changeEraser()"><IconErase class="icon" /></div>
+        <div class="btn" :class="{ 'active': writingBoardModel === 'eraser' }" @click="changeModel('eraser')"><IconErase class="icon" /></div>
       </Tooltip>
       <Tooltip :mouseLeaveDelay="0" :mouseEnterDelay="0.3" title="清除墨迹">
         <div class="btn" @click="clearCanvas()"><IconClear class="icon" /></div>
@@ -40,10 +48,19 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, PropType, ref } from 'vue'
 import WritingBoard from '@/components/WritingBoard.vue'
 
-const writingBoardColors = ['#000000', '#ffffff', '#1e497b', '#4e81bb', '#e2534d', '#9aba60', '#8165a0', '#47acc5', '#f9974c']
+const writingBoardColors = ['#000000', '#ffffff', '#1e497b', '#4e81bb', '#e2534d', '#9aba60', '#8165a0', '#47acc5', '#f9974c', '#ffff3a']
+
+interface Position {
+  left?: number | string;
+  right?: number | string;
+  top?: number | string;
+  bottom?: number | string;
+}
+
+type WritingBoardModel = 'pen' | 'mark' | 'eraser'
 
 export default defineComponent({
   name: 'writing-board-tool',
@@ -51,20 +68,31 @@ export default defineComponent({
   components: {
     WritingBoard,
   },
+  props: {
+    slideWidth: {
+      type: Number,
+      required: true,
+    },
+    slideHeight: {
+      type: Number,
+      required: true,
+    },
+    position: {
+      type: Object as PropType<Position>,
+      default: () => ({
+        right: '5px',
+        bottom: '5px',
+      })
+    },
+  },
   setup(props, { emit }) {
     const writingBoardRef = ref()
     const writingBoardColor = ref('#e2534d')
-    const writingBoardModel = ref('pen')
+    const writingBoardModel = ref<WritingBoardModel>('pen')
     const blackboard = ref(false)
 
-    // 切换到画笔状态
-    const changePen = () => {
-      writingBoardModel.value = 'pen'
-    }
-
-    // 切换到橡皮状态
-    const changeEraser = () => {
-      writingBoardModel.value = 'eraser'
+    const changeModel = (model: WritingBoardModel) => {
+      writingBoardModel.value = model
     }
 
     // 清除画布上的墨迹
@@ -72,9 +100,9 @@ export default defineComponent({
       writingBoardRef.value.clearCanvas()
     }
 
-    // 修改画笔颜色，如果当前不处于画笔状态则先切换到画笔状态
+    // 修改画笔颜色，如果当前处于橡皮状态则先切换到画笔状态
     const changeColor = (color: string) => {
-      if (writingBoardModel.value !== 'pen') writingBoardModel.value = 'pen'
+      if (writingBoardModel.value === 'eraser') writingBoardModel.value = 'pen'
       writingBoardColor.value = color
     }
     
@@ -89,8 +117,7 @@ export default defineComponent({
       writingBoardColor,
       writingBoardModel,
       blackboard,
-      changePen,
-      changeEraser,
+      changeModel,
       clearCanvas,
       changeColor,
       closeWritingBoard,
@@ -102,12 +129,19 @@ export default defineComponent({
 <style lang="scss" scoped>
 .writing-board-tool {
   font-size: 12px;
+  z-index: 10;
+  @include absolute-0();
+
+  .writing-board-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 
   .tools {
     height: 50px;
     position: fixed;
-    bottom: 5px;
-    left: 5px;
     z-index: 11;
     padding: 12px;
     background-color: #eee;

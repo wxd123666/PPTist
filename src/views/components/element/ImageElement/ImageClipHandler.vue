@@ -34,8 +34,8 @@
       @mousedown.stop="$event => moveClipRange($event)"
     >
       <div 
-        :class="['clip-point', point]" 
-        v-for="point in ['t-l', 't-r', 'b-l', 'b-r']" 
+        :class="['clip-point', point, rotateClassName]"
+        v-for="point in ['left-top', 'right-top', 'left-bottom', 'right-bottom']" 
         :key="point" 
         @mousedown.stop="$event => scaleClipRange($event, point)"
       >
@@ -48,8 +48,8 @@
         </svg>
       </div>
       <div 
-        :class="['clip-point', '', point]" 
-        v-for="point in ['t', 'b', 'l', 'r']" 
+        :class="['clip-point', point, rotateClassName]"
+        v-for="point in ['top', 'bottom', 'left', 'right']" 
         :key="point" 
         @mousedown.stop="$event => scaleClipRange($event, point)"
       >
@@ -66,13 +66,11 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, PropType, reactive, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, PropType, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useKeyboardStore } from '@/store'
 import { KEYS } from '@/configs/hotkey'
-import { ImageClipData, ImageClipDataRange, ImageClipedEmitData } from '@/types/edit'
-
-type ScaleClipRangeType = 't-l' | 't-r' | 'b-l' | 'b-r'
+import { ImageClipData, ImageClipDataRange, ImageClipedEmitData, OperateResizeHandlers } from '@/types/edit'
 
 export default defineComponent({
   name: 'image-clip-handler',
@@ -105,12 +103,16 @@ export default defineComponent({
       type: Number,
       required: true,
     },
+    rotate: {
+      type: Number,
+      required: true,
+    },
   },
   setup(props, { emit }) {
     const { canvasScale } = storeToRefs(useMainStore())
     const { ctrlOrShiftKeyActive } = storeToRefs(useKeyboardStore())
 
-    const clipWrapperPositionStyle = reactive({
+    const clipWrapperPositionStyle = ref({
       top: '0',
       left: '0',
     })
@@ -151,7 +153,7 @@ export default defineComponent({
     })
 
     // 顶层图片容器位置大小（裁剪高亮区域）
-    const topImgWrapperPosition = reactive({
+    const topImgWrapperPosition = ref({
       top: 0,
       left: 0,
       width: 0,
@@ -160,11 +162,12 @@ export default defineComponent({
 
     // 顶层图片容器位置大小样式（裁剪高亮区域）
     const topImgWrapperPositionStyle = computed(() => {
+      const { top, left, width, height } = topImgWrapperPosition.value
       return {
-        top: topImgWrapperPosition.top + '%',
-        left: topImgWrapperPosition.left + '%',
-        width: topImgWrapperPosition.width + '%',
-        height: topImgWrapperPosition.height + '%',
+        top: top + '%',
+        left: left + '%',
+        width: width + '%',
+        height: height + '%',
       }
     })
 
@@ -173,29 +176,30 @@ export default defineComponent({
       const bottomWidth = imgPosition.value.width
       const bottomHeight = imgPosition.value.height
       
-      const topLeft = topImgWrapperPosition.left
-      const topTop = topImgWrapperPosition.top
-      const topWidth = topImgWrapperPosition.width
-      const topHeight = topImgWrapperPosition.height
+      const { top, left, width, height } = topImgWrapperPosition.value
       
       return {
-        left: -topLeft * (100 / topWidth) + '%',
-        top: -topTop * (100 / topHeight) + '%',
-        width: bottomWidth / topWidth * 100 + '%',
-        height: bottomHeight / topHeight * 100 + '%',
+        left: -left * (100 / width) + '%',
+        top: -top * (100 / height) + '%',
+        width: bottomWidth / width * 100 + '%',
+        height: bottomHeight / height * 100 + '%',
       }
     })
 
     // 初始化裁剪位置信息
     const initClipPosition = () => {
       const { left, top } = getClipDataTransformInfo()
-      topImgWrapperPosition.left = left
-      topImgWrapperPosition.top = top
-      topImgWrapperPosition.width = 100
-      topImgWrapperPosition.height = 100
+      topImgWrapperPosition.value = {
+        left: left,
+        top: top,
+        width: 100,
+        height: 100,
+      }
       
-      clipWrapperPositionStyle.top = -top + '%'
-      clipWrapperPositionStyle.left = -left + '%'
+      clipWrapperPositionStyle.value = {
+        top: -top + '%',
+        left: -left + '%',
+      }
     }
 
     // 执行裁剪：计算裁剪后的图片位置大小和裁剪信息，并将数据同步出去
@@ -210,10 +214,10 @@ export default defineComponent({
       const { left, top } = getClipDataTransformInfo()
 
       const position = {
-        left: (topImgWrapperPosition.left - left) / 100 * props.width,
-        top: (topImgWrapperPosition.top - top) / 100 * props.height,
-        width: (topImgWrapperPosition.width - 100) / 100 * props.width,
-        height: (topImgWrapperPosition.height - 100) / 100 * props.height,
+        left: (topImgWrapperPosition.value.left - left) / 100 * props.width,
+        top: (topImgWrapperPosition.value.top - top) / 100 * props.height,
+        width: (topImgWrapperPosition.value.width - 100) / 100 * props.width,
+        height: (topImgWrapperPosition.value.height - 100) / 100 * props.height,
       }
 
       const clipedEmitData: ImageClipedEmitData = {
@@ -269,12 +273,7 @@ export default defineComponent({
       const startPageX = e.pageX
       const startPageY = e.pageY
       const bottomPosition = imgPosition.value
-      const originPositopn = {
-        left: topImgWrapperPosition.left,
-        top: topImgWrapperPosition.top,
-        width: topImgWrapperPosition.width,
-        height: topImgWrapperPosition.height,
-      }
+      const originPositopn = { ...topImgWrapperPosition.value }
 
       document.onmousemove = e => {
         if (!isMouseDown) return
@@ -282,8 +281,21 @@ export default defineComponent({
         const currentPageX = e.pageX
         const currentPageY = e.pageY
 
-        const moveX = (currentPageX - startPageX) / canvasScale.value / props.width * 100
-        const moveY = (currentPageY - startPageY) / canvasScale.value / props.height * 100
+        let moveX = (currentPageX - startPageX) / canvasScale.value / props.width * 100
+        let moveY = (currentPageY - startPageY) / canvasScale.value / props.height * 100
+
+        if (props.rotate > 45 && props.rotate < 135) {
+          moveX = (currentPageY - startPageY) / canvasScale.value / props.width * 100
+          moveY = -(currentPageX - startPageX) / canvasScale.value / props.height * 100
+        }
+        if ((props.rotate >= 135 && props.rotate <= 180) || (props.rotate >= -180 && props.rotate <= -135)) {
+          moveX = -moveX
+          moveY = -moveY
+        }
+        if (props.rotate > -135 && props.rotate < -45) {
+          moveX = -(currentPageY - startPageY) / canvasScale.value / props.width * 100
+          moveY = (currentPageX - startPageX) / canvasScale.value / props.height * 100
+        }
 
         let targetLeft = originPositopn.left + moveX
         let targetTop = originPositopn.top + moveY
@@ -297,8 +309,11 @@ export default defineComponent({
           targetTop = bottomPosition.height - originPositopn.height
         }
         
-        topImgWrapperPosition.left = targetLeft
-        topImgWrapperPosition.top = targetTop
+        topImgWrapperPosition.value = {
+          ...topImgWrapperPosition.value,
+          left: targetLeft,
+          top: targetTop,
+        }
       }
 
       document.onmouseup = () => {
@@ -315,7 +330,7 @@ export default defineComponent({
     }
 
     // 缩放裁剪区域
-    const scaleClipRange = (e: MouseEvent, type: ScaleClipRangeType) => {
+    const scaleClipRange = (e: MouseEvent, type: OperateResizeHandlers) => {
       isSettingClipRange.value = true
       let isMouseDown = true
 
@@ -325,14 +340,9 @@ export default defineComponent({
       const startPageX = e.pageX
       const startPageY = e.pageY
       const bottomPosition = imgPosition.value
-      const originPositopn = {
-        left: topImgWrapperPosition.left,
-        top: topImgWrapperPosition.top,
-        width: topImgWrapperPosition.width,
-        height: topImgWrapperPosition.height,
-      }
+      const originPositopn = { ...topImgWrapperPosition.value }
 
-      const aspectRatio = topImgWrapperPosition.width / topImgWrapperPosition.height
+      const aspectRatio = topImgWrapperPosition.value.width / topImgWrapperPosition.value.height
 
       document.onmousemove = e => {
         if (!isMouseDown) return
@@ -343,14 +353,27 @@ export default defineComponent({
         let moveX = (currentPageX - startPageX) / canvasScale.value / props.width * 100
         let moveY = (currentPageY - startPageY) / canvasScale.value / props.height * 100
 
+        if (props.rotate > 45 && props.rotate < 135) {
+          moveX = (currentPageY - startPageY) / canvasScale.value / props.width * 100
+          moveY = -(currentPageX - startPageX) / canvasScale.value / props.height * 100
+        }
+        if ((props.rotate >= 135 && props.rotate <= 180) || (props.rotate >= -180 && props.rotate <= -135)) {
+          moveX = -moveX
+          moveY = -moveY
+        }
+        if (props.rotate > -135 && props.rotate < -45) {
+          moveX = -(currentPageY - startPageY) / canvasScale.value / props.width * 100
+          moveY = (currentPageX - startPageX) / canvasScale.value / props.height * 100
+        }
+
         if (ctrlOrShiftKeyActive.value) {
-          if (type === 'b-r' || type === 't-l') moveY = moveX / aspectRatio
-          if (type === 'b-l' || type === 't-r') moveY = -moveX / aspectRatio
+          if (type === OperateResizeHandlers.RIGHT_BOTTOM || type === OperateResizeHandlers.LEFT_TOP) moveY = moveX / aspectRatio
+          if (type === OperateResizeHandlers.LEFT_BOTTOM || type === OperateResizeHandlers.RIGHT_TOP) moveY = -moveX / aspectRatio
         }
 
         let targetLeft, targetTop, targetWidth, targetHeight
 
-        if (type === 't-l') {
+        if (type === OperateResizeHandlers.LEFT_TOP) {
           if (originPositopn.left + moveX < 0) {
             moveX = -originPositopn.left
           }
@@ -368,7 +391,7 @@ export default defineComponent({
           targetLeft = originPositopn.left + moveX
           targetTop = originPositopn.top + moveY
         }
-        else if (type === 't-r') {
+        else if (type === OperateResizeHandlers.RIGHT_TOP) {
           if (originPositopn.left + originPositopn.width + moveX > bottomPosition.width) {
             moveX = bottomPosition.width - (originPositopn.left + originPositopn.width)
           }
@@ -386,7 +409,7 @@ export default defineComponent({
           targetLeft = originPositopn.left
           targetTop = originPositopn.top + moveY
         }
-        else if (type === 'b-l') {
+        else if (type === OperateResizeHandlers.LEFT_BOTTOM) {
           if (originPositopn.left + moveX < 0) {
             moveX = -originPositopn.left
           }
@@ -404,7 +427,7 @@ export default defineComponent({
           targetLeft = originPositopn.left + moveX
           targetTop = originPositopn.top
         }
-        else if (type === 'b-r') {
+        else if (type === OperateResizeHandlers.RIGHT_BOTTOM) {
           if (originPositopn.left + originPositopn.width + moveX > bottomPosition.width) {
             moveX = bottomPosition.width - (originPositopn.left + originPositopn.width)
           }
@@ -422,7 +445,7 @@ export default defineComponent({
           targetLeft = originPositopn.left
           targetTop = originPositopn.top
         }
-        else if (type === 't') {
+        else if (type === OperateResizeHandlers.TOP) {
           if (originPositopn.top + moveY < 0) {
             moveY = -originPositopn.top
           }
@@ -434,7 +457,7 @@ export default defineComponent({
           targetLeft = originPositopn.left
           targetTop = originPositopn.top + moveY
         }
-        else if (type === 'b') {
+        else if (type === OperateResizeHandlers.BOTTOM) {
           if (originPositopn.top + originPositopn.height + moveY > bottomPosition.height) {
             moveY = bottomPosition.height - (originPositopn.top + originPositopn.height)
           }
@@ -446,7 +469,7 @@ export default defineComponent({
           targetLeft = originPositopn.left
           targetTop = originPositopn.top
         }
-        else if (type === 'l') {
+        else if (type === OperateResizeHandlers.LEFT) {
           if (originPositopn.left + moveX < 0) {
             moveX = -originPositopn.left
           }
@@ -470,11 +493,13 @@ export default defineComponent({
           targetLeft = originPositopn.left
           targetTop = originPositopn.top
         }
-        
-        topImgWrapperPosition.left = targetLeft
-        topImgWrapperPosition.top = targetTop
-        topImgWrapperPosition.width = targetWidth
-        topImgWrapperPosition.height = targetHeight
+
+        topImgWrapperPosition.value = {
+          left: targetLeft,
+          top: targetTop,
+          width: targetWidth,
+          height: targetHeight,
+        }
       }
 
       document.onmouseup = () => {
@@ -488,11 +513,26 @@ export default defineComponent({
       }
     }
 
+    const rotateClassName = computed(() => {
+      const prefix = 'rotate-'
+      const rotate = props.rotate
+      if (rotate > -22.5 && rotate <= 22.5) return prefix + 0
+      else if (rotate > 22.5 && rotate <= 67.5) return prefix + 45
+      else if (rotate > 67.5 && rotate <= 112.5) return prefix + 90
+      else if (rotate > 112.5 && rotate <= 157.5) return prefix + 135
+      else if (rotate > 157.5 || rotate <= -157.5) return prefix + 0
+      else if (rotate > -157.5 && rotate <= -112.5) return prefix + 45
+      else if (rotate > -112.5 && rotate <= -67.5) return prefix + 90
+      else if (rotate > -67.5 && rotate <= -22.5) return prefix + 135
+      return prefix + 0
+    })
+
     return {
       clipWrapperPositionStyle,
       bottomImgPositionStyle,
       topImgWrapperPositionStyle,
       topImgPositionStyle,
+      rotateClassName,
       handleClip,
       moveClipRange,
       scaleClipRange,
@@ -548,58 +588,91 @@ export default defineComponent({
     overflow: visible;
   }
 
-  &.t-l {
+  &.left-top {
     left: 0;
     top: 0;
-    cursor: nwse-resize;
   }
-  &.t-r {
+  &.right-top {
     left: 100%;
     top: 0;
     transform: rotate(90deg);
     transform-origin: 0 0;
-    cursor: nesw-resize;
   }
-  &.b-l {
+  &.left-bottom {
     left: 0;
     top: 100%;
     transform: rotate(-90deg);
     transform-origin: 0 0;
-    cursor: nesw-resize;
   }
-  &.b-r {
+  &.right-bottom {
     left: 100%;
     top: 100%;
     transform: rotate(180deg);
     transform-origin: 0 0;
-    cursor: nwse-resize;
   }
-  &.t {
-    cursor: n-resize;
+  &.top {
     left: 50%;
     top: 0;
     margin-left: -8px;
   }
-  &.b {
-    cursor: n-resize;
+  &.bottom {
     left: 50%;
     bottom: 0;
     margin-left: -8px;
     transform: rotate(180deg);
   }
-  &.l {
-    cursor: w-resize;
+  &.left {
     left: 0;
     top: 50%;
     margin-top: -8px;
     transform: rotate(-90deg);
   }
-  &.r {
-    cursor: w-resize;
+  &.right {
     right: 0;
     top: 50%;
     margin-top: -8px;
     transform: rotate(90deg);
+  }
+
+  &.left-top.rotate-0,
+  &.right-bottom.rotate-0,
+  &.left.rotate-45,
+  &.right.rotate-45,
+  &.left-bottom.rotate-90,
+  &.right-top.rotate-90,
+  &.top.rotate-135,
+  &.bottom.rotate-135 {
+    cursor: nwse-resize;
+  }
+  &.top.rotate-0,
+  &.bottom.rotate-0,
+  &.left-top.rotate-45,
+  &.right-bottom.rotate-45,
+  &.left.rotate-90,
+  &.right.rotate-90,
+  &.left-bottom.rotate-135,
+  &.right-top.rotate-135 {
+    cursor: ns-resize;
+  }
+  &.left-bottom.rotate-0,
+  &.right-top.rotate-0,
+  &.top.rotate-45,
+  &.bottom.rotate-45,
+  &.left-top.rotate-90,
+  &.right-bottom.rotate-90,
+  &.left.rotate-135,
+  &.right.rotate-135 {
+    cursor: nesw-resize;
+  }
+  &.left.rotate-0,
+  &.right.rotate-0,
+  &.left-bottom.rotate-45,
+  &.right-top.rotate-45,
+  &.top.rotate-90,
+  &.bottom.rotate-90,
+  &.left-top.rotate-135,
+  &.right-bottom.rotate-135 {
+    cursor: ew-resize;
   }
 }
 </style>

@@ -1,11 +1,12 @@
 import { storeToRefs } from 'pinia'
+import { nanoid } from 'nanoid'
 import { useMainStore, useSlidesStore } from '@/store'
-import { createRandomCode } from '@/utils/common'
 import { getImageSize } from '@/utils/image'
 import { VIEWPORT_SIZE } from '@/configs/canvas'
-import { PPTLineElement, ChartType, PPTElement, TableCell, TableCellStyle, PPTShapeElement } from '@/types/slides'
-import { ShapePoolItem } from '@/configs/shapes'
+import { PPTLineElement, PPTElement, TableCell, TableCellStyle, PPTShapeElement, PPTChartElement, ChartOptions, PresetChartType } from '@/types/slides'
+import { ShapePoolItem, SHAPE_PATH_FORMULAS } from '@/configs/shapes'
 import { LinePoolItem } from '@/configs/lines'
+import { CHART_TYPES } from '@/configs/chartTypes'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 
 interface CommonElementPosition {
@@ -63,7 +64,7 @@ export default () => {
 
       createElement({
         type: 'image',
-        id: createRandomCode(),
+        id: nanoid(10),
         src,
         width,
         height,
@@ -79,11 +80,11 @@ export default () => {
    * 创建图表元素
    * @param chartType 图表类型
    */
-  const createChartElement = (chartType: ChartType) => {
-    createElement({
+  const createChartElement = (type: PresetChartType) => {
+    const newElement: PPTChartElement = {
       type: 'chart',
-      id: createRandomCode(),
-      chartType,
+      id: nanoid(10),
+      chartType: CHART_TYPES[type],
       left: 300,
       top: 81.25,
       width: 400,
@@ -98,6 +99,17 @@ export default () => {
           [12, 19, 5, 2, 18],
         ],
       },
+    }
+
+    let options: ChartOptions = {}
+    if (type === 'horizontalBar') options = { horizontalBars: true }
+    else if (type === 'area') options = { showArea: true }
+    else if (type === 'scatter') options = { showLine: false }
+    else if (type === 'ring') options = { donut: true }
+
+    createElement({
+      ...newElement,
+      options,
     })
   }
   
@@ -115,7 +127,7 @@ export default () => {
     for (let i = 0; i < row; i++) {
       const rowCells: TableCell[] = []
       for (let j = 0; j < col; j++) {
-        rowCells.push({ id: createRandomCode(), colspan: 1, rowspan: 1, text: '', style })
+        rowCells.push({ id: nanoid(10), colspan: 1, rowspan: 1, text: '', style })
       }
       data.push(rowCells)
     }
@@ -130,7 +142,7 @@ export default () => {
 
     createElement({
       type: 'table',
-      id: createRandomCode(),
+      id: nanoid(10),
       width,
       height,
       colWidths,
@@ -162,7 +174,7 @@ export default () => {
     const { left, top, width, height } = position
     createElement({
       type: 'text',
-      id: createRandomCode(),
+      id: nanoid(10),
       left, 
       top, 
       width, 
@@ -183,7 +195,7 @@ export default () => {
     const { left, top, width, height } = position
     const newElement: PPTShapeElement = {
       type: 'shape',
-      id: createRandomCode(),
+      id: nanoid(10),
       left, 
       top, 
       width, 
@@ -195,6 +207,11 @@ export default () => {
       rotate: 0,
     }
     if (data.special) newElement.special = true
+    if (data.pathFormula) {
+      newElement.pathFormula = data.pathFormula
+      newElement.viewBox = [width, height]
+      newElement.path = SHAPE_PATH_FORMULAS[data.pathFormula](width, height)
+    }
     createElement(newElement)
   }
   
@@ -208,7 +225,7 @@ export default () => {
 
     const newElement: PPTLineElement = {
       type: 'line',
-      id: createRandomCode(),
+      id: nanoid(10),
       left, 
       top, 
       start,
@@ -220,6 +237,7 @@ export default () => {
     }
     if (data.isBroken) newElement.broken = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
     if (data.isCurve) newElement.curve = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
+    if (data.isCubic) newElement.cubic = [[(start[0] + end[0]) / 2, (start[1] + end[1]) / 2], [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]]
     createElement(newElement)
   }
   
@@ -230,7 +248,7 @@ export default () => {
   const createLatexElement = (data: { path: string; latex: string; w: number; h: number; }) => {
     createElement({
       type: 'latex',
-      id: createRandomCode(),
+      id: nanoid(10),
       width: data.w,
       height: data.h,
       rotate: 0,
@@ -252,7 +270,7 @@ export default () => {
   const createVideoElement = (src: string) => {
     createElement({
       type: 'video',
-      id: createRandomCode(),
+      id: nanoid(10),
       width: 500,
       height: 300,
       rotate: 0,
@@ -269,7 +287,7 @@ export default () => {
   const createAudioElement = (src: string) => {
     createElement({
       type: 'audio',
-      id: createRandomCode(),
+      id: nanoid(10),
       width: 50,
       height: 50,
       rotate: 0,

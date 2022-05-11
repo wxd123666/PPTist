@@ -1,5 +1,20 @@
 import { IBarChartOptions, ILineChartOptions, IPieChartOptions } from 'chartist'
 
+export const enum ShapePathFormulasKeys {
+  ROUND_RECT = 'roundRect',
+  ROUND_RECT_DIAGONAL = 'roundRectDiagonal',
+  ROUND_RECT_SINGLE = 'roundRectSingle',
+  ROUND_RECT_SAMESIDE = 'roundRectSameSide',
+  CUT_RECT_DIAGONAL = 'cutRectDiagonal',
+  CUT_RECT_SINGLE = 'cutRectSingle',
+  CUT_RECT_SAMESIDE = 'cutRectSameSide',
+  MESSAGE = 'message',
+  ROUND_MESSAGE = 'roundMessage',
+  L = 'L',
+  RING_RECT = 'ringRect',
+  PLUS = 'plus',
+}
+
 export const enum ElementTypes {
   TEXT = 'text',
   IMAGE = 'image',
@@ -254,7 +269,7 @@ export interface ShapeText {
  * 
  * type: 元素类型（shape）
  * 
- * viewBox: SVG的viewBox属性，默认为正方形，例如 1000 表示 '0 0 1000 1000'
+ * viewBox: SVG的viewBox属性，例如 [1000, 1000] 表示 '0 0 1000 1000'
  * 
  * path: 形状路径，SVG path 的 d 属性
  * 
@@ -277,10 +292,14 @@ export interface ShapeText {
  * special?: 特殊形状（标记一些难以解析的形状，例如路径使用了 L Q C A 以外的类型，该类形状在导出后将变为图片的形式）
  * 
  * text?: 形状内文本
+ * 
+ * pathFormula?: 形状路径计算公式
+ * 一般情况下，形状的大小变化时仅由宽高基于 viewBox 的缩放比例来调整形状，而 viewBox 本身和 path 不会变化，
+ * 但也有一些形状希望能更精确的控制一些关键点的位置，此时就需要提供路径计算公式，通过在缩放时更新 viewBox 并重新计算 path 来重新绘制形状
  */
 export interface PPTShapeElement extends PPTBaseElement {
   type: 'shape';
-  viewBox: number;
+  viewBox: [number, number];
   path: string;
   fixedRatio: boolean;
   fill: string;
@@ -292,6 +311,7 @@ export interface PPTShapeElement extends PPTBaseElement {
   shadow?: PPTElementShadow;
   special?: boolean;
   text?: ShapeText;
+  pathFormula?: ShapePathFormulasKeys;
 }
 
 
@@ -314,9 +334,11 @@ export type LinePoint = '' | 'arrow' | 'dot'
  * 
  * shadow?: 阴影
  * 
- * broken?: 折线中点位置（[x, y]）
+ * broken?: 折线控制点位置（[x, y]）
  * 
- * curve?: 曲线中点位置（[x, y]）
+ * curve?: 二次曲线控制点位置（[x, y]）
+ * 
+ * curve?: 三次曲线控制点位置（[[x1, y1], [x2, y2]]）
  */
 export interface PPTLineElement extends Omit<PPTBaseElement, 'height' | 'rotate'> {
   type: 'line';
@@ -328,10 +350,13 @@ export interface PPTLineElement extends Omit<PPTBaseElement, 'height' | 'rotate'
   shadow?: PPTElementShadow;
   broken?: [number, number];
   curve?: [number, number];
+  cubic?: [[number, number], [number, number]];
 }
 
 
+export type PresetChartType = 'bar' | 'horizontalBar' | 'line' | 'area' | 'scatter' | 'pie' | 'ring'
 export type ChartType = 'bar' | 'line' | 'pie'
+export type ChartOptions = ILineChartOptions & IBarChartOptions & IPieChartOptions
 export interface ChartData {
   labels: string[];
   legends: string[];
@@ -345,7 +370,7 @@ export interface ChartData {
  * 
  * fill?: 填充色
  * 
- * chartType: 图表类型
+ * chartType: 图表基础类型（bar/line/pie），所有图表类型都是由这三种基本类型衍生而来
  * 
  * data: 图表数据
  * 
@@ -364,7 +389,7 @@ export interface PPTChartElement extends PPTBaseElement {
   fill?: string;
   chartType: ChartType;
   data: ChartData;
-  options?: ILineChartOptions & IBarChartOptions & IPieChartOptions;
+  options?: ChartOptions;
   outline?: PPTElementOutline;
   themeColor: string[];
   gridColor?: string;

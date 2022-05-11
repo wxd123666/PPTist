@@ -3,6 +3,10 @@
     <div class="blackboard" v-if="blackboard"></div>
 
     <canvas class="canvas" ref="canvasRef"
+      :style="{
+        width: canvasWidth + 'px',
+        height: canvasHeight + 'px',
+      }"
       @mousedown="$event => handleMousedown($event)"
       @mousemove="$event => handleMousemove($event)"
       @mouseup="handleMouseup()"
@@ -13,34 +17,49 @@
       @mouseenter="mouseInCanvas = true"
     ></canvas>
 
-    <div 
-      class="pen"
-      :style="{
-        left: mouse.x - penSize / 2 + 'px',
-        top: mouse.y - 36 + penSize / 2 + 'px',
-        color: color,
-      }"
-      v-if="mouseInCanvas && model === 'pen'"
-    ><IconWrite class="icon" size="36" /></div>
-    
-    <div 
-      class="eraser"
-      :style="{
-        left: mouse.x - rubberSize / 2 + 'px',
-        top: mouse.y - rubberSize / 2 + 'px',
-        width: rubberSize + 'px',
-        height: rubberSize + 'px',
-      }"
-      v-if="mouseInCanvas && model === 'eraser'"
-    ></div>
+    <template v-if="mouseInCanvas">
+      <div 
+        class="eraser"
+        :style="{
+          left: mouse.x - rubberSize / 2 + 'px',
+          top: mouse.y - rubberSize / 2 + 'px',
+          width: rubberSize + 'px',
+          height: rubberSize + 'px',
+        }"
+        v-if="model === 'eraser'"
+      ></div>
+      <div 
+        class="pen"
+        :style="{
+          left: mouse.x - penSize / 2 + 'px',
+          top: mouse.y - 36 + penSize / 2 + 'px',
+          color: color,
+        }"
+        v-if="model === 'pen'"
+      >
+        <IconWrite class="icon" size="36" v-if="model === 'pen'" />
+      </div>
+      <div 
+        class="pen"
+        :style="{
+          left: mouse.x - markSize / 2 + 'px',
+          top: mouse.y + 'px',
+          color: color,
+        }"
+        v-if="model === 'mark'"
+      >
+        <IconHighLight class="icon" size="36" v-if="model === 'mark'" />
+      </div>
+    </template>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, PropType, reactive, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
 
 const penSize = 6
 const rubberSize = 80
+const markSize = 25
 
 export default defineComponent({
   name: 'writing-board',
@@ -50,7 +69,7 @@ export default defineComponent({
       default: '#ffcc00',
     },
     model: {
-      type: String as PropType<'pen' | 'eraser'>,
+      type: String as PropType<'pen' | 'eraser' | 'mark'>,
       default: 'pen',
     },
     blackboard: {
@@ -72,20 +91,33 @@ export default defineComponent({
     let lastLineWidth = -1
 
     // 鼠标位置坐标：用于画笔或橡皮位置跟随
-    const mouse = reactive({
+    const mouse = ref({
       x: 0,
       y: 0,
     })
-
-    // 更新鼠标位置坐标
-    const updateMousePosition = (x: number, y: number) => {
-      mouse.x = x
-      mouse.y = y
-    }
     
     // 鼠标是否处在画布范围内：处在范围内才会显示画笔或橡皮
     const mouseInCanvas = ref(false)
 
+    // 监听更新canvas尺寸
+    const canvasWidth = ref(0)
+    const canvasHeight = ref(0)
+
+    const widthScale = computed(() => canvasRef.value ? canvasWidth.value / canvasRef.value.width : 1)
+    const heightScale = computed(() => canvasRef.value ? canvasHeight.value / canvasRef.value.height : 1)
+
+    const updateCanvasSize = () => {
+      if (!writingBoardRef.value) return
+      canvasWidth.value = writingBoardRef.value.clientWidth
+      canvasHeight.value = writingBoardRef.value.clientHeight
+    }
+    const resizeObserver = new ResizeObserver(updateCanvasSize)
+    onMounted(() => {
+      if (writingBoardRef.value) resizeObserver.observe(writingBoardRef.value)
+    })
+    onUnmounted(() => {
+      if (writingBoardRef.value) resizeObserver.unobserve(writingBoardRef.value)
+    })
 
     // 初始化画布
     const initCanvas = () => {
@@ -97,13 +129,24 @@ export default defineComponent({
       canvasRef.value.width = writingBoardRef.value.clientWidth
       canvasRef.value.height = writingBoardRef.value.clientHeight
 
-      canvasRef.value.style.width = writingBoardRef.value.clientWidth + 'px'
-      canvasRef.value.style.height = writingBoardRef.value.clientHeight + 'px'
-
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
     }
     onMounted(initCanvas)
+
+    // 切换画笔模式时，更新 canvas ctx 配置
+    const updateCtx = () => {
+      if (!ctx) return
+      if (props.model === 'mark') {
+        ctx.globalCompositeOperation = 'xor'
+        ctx.globalAlpha = 0.5
+      }
+      else if (props.model === 'pen') {
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.globalAlpha = 1
+      }
+    }
+    watch(() => props.model, updateCtx)
 
     // 绘制画笔墨迹方法
     const draw = (posX: number, posY: number, lineWidth: number) => {
@@ -191,34 +234,47 @@ export default defineComponent({
         draw(x, y, lineWidth)
         lastLineWidth = lineWidth
       }
+      else if (props.model === 'mark') draw(x, y, markSize)
       else erase(x, y)
 
-      lastPos = {x, y}
+      lastPos = { x, y }
       lastTime = new Date().getTime()
+    }
+
+    // 获取鼠标在canvas中的相对位置
+    const getMouseOffsetPosition = (e: MouseEvent | TouchEvent) => {
+      if (!canvasRef.value) return [0, 0]
+      const event = e instanceof MouseEvent ? e : e.changedTouches[0]
+      const canvasRect = canvasRef.value.getBoundingClientRect()
+      const x = event.pageX - canvasRect.x
+      const y = event.pageY - canvasRect.y
+      return [x, y]
     }
 
     // 处理鼠标（触摸）事件
     // 准备开始绘制/擦除墨迹（落笔）
     const handleMousedown = (e: MouseEvent | TouchEvent) => {
-      const x = e instanceof MouseEvent ? e.offsetX : e.changedTouches[0].pageX
-      const y = e instanceof MouseEvent ? e.offsetY : e.changedTouches[0].pageY
+      const [mouseX, mouseY] = getMouseOffsetPosition(e)
+      const x = mouseX / widthScale.value
+      const y = mouseY / heightScale.value
 
       isMouseDown = true
       lastPos = { x, y }
       lastTime = new Date().getTime()
 
       if (e instanceof TouchEvent) {
-        updateMousePosition(x, y)
+        mouse.value = { x: mouseX, y: mouseY }
         mouseInCanvas.value = true
       }
     }
 
     // 开始绘制/擦除墨迹（移动）
     const handleMousemove = (e: MouseEvent | TouchEvent) => {
-      const x = e instanceof MouseEvent ? e.offsetX : e.changedTouches[0].pageX
-      const y = e instanceof MouseEvent ? e.offsetY : e.changedTouches[0].pageY
+      const [mouseX, mouseY] = getMouseOffsetPosition(e)
+      const x = mouseX / widthScale.value
+      const y = mouseY / heightScale.value
 
-      updateMousePosition(x, y)
+      mouse.value = { x: mouseX, y: mouseY }
 
       if (isMouseDown) handleMove(x, y)
     }
@@ -235,17 +291,37 @@ export default defineComponent({
       ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
     }
 
+    // 获取 DataURL
+    const getImageDataURL = () => {
+      return canvasRef.value?.toDataURL()
+    }
+    
+    // 设置 DataURL（绘制图片到 canvas）
+    const setImageDataURL = (imageDataURL: string) => {
+      const img = new Image()
+      img.src = imageDataURL
+      img.onload = () => {
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0)
+      }
+    }
+
     return {
       mouse,
       mouseInCanvas,
       penSize,
       rubberSize,
+      markSize,
       writingBoardRef,
       canvasRef,
+      canvasWidth,
+      canvasHeight,
       handleMousedown,
       handleMousemove,
       handleMouseup,
       clearCanvas,
+      getImageDataURL,
+      setImageDataURL,
     }
   },
 })
@@ -253,13 +329,9 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .writing-board {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
   z-index: 8;
   cursor: none;
+  @include absolute-0();
 }
 .blackboard {
   width: 100%;
@@ -267,11 +339,13 @@ export default defineComponent({
   background-color: #0f392b;
 }
 .canvas {
-  @include absolute-0();
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 .eraser, .pen {
   pointer-events: none;
-  position: fixed;
+  position: absolute;
   z-index: 9;
 
   .icon {

@@ -23,9 +23,8 @@
           :outline="elementInfo.outline"
         />
         <Chart
-          :class="{ 'need-scale': needScaleSize }"
-          :width="chartWidth"
-          :height="chartHeight"
+          :width="elementInfo.width * zoom"
+          :height="elementInfo.height * zoom"
           :type="elementInfo.chartType"
           :data="elementInfo.data"
           :options="elementInfo.options"
@@ -33,6 +32,7 @@
           :gridColor="elementInfo.gridColor"
           :legends="elementInfo.data.legends"
           :legend="elementInfo.legend || ''"
+          :style="{ zoom: 1 / zoom }"
         />
       </div>
     </div>
@@ -40,8 +40,9 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, PropType } from 'vue'
+import { computed, defineComponent, inject, PropType, ref } from 'vue'
 import { PPTChartElement } from '@/types/slides'
+import { injectKeySlideScale } from '@/types/injectKey'
 
 import ElementOutline from '@/views/components/element/ElementOutline.vue'
 import Chart from './Chart.vue'
@@ -57,15 +58,16 @@ export default defineComponent({
       type: Object as PropType<PPTChartElement>,
       required: true,
     },
-    needScaleSize: {
-      type: Boolean,
-      default: true,
-    },
   },
-  setup(props) {
+  setup() {
+    const slideScale = inject(injectKeySlideScale) || ref(1)
+
+    const needScaleSize = computed(() => slideScale.value < 1)
+    const zoom = computed(() => needScaleSize.value ? 1 / slideScale.value : 1)
+
     return {
-      chartWidth: computed(() => props.needScaleSize ? props.elementInfo.width * 10 : props.elementInfo.width),
-      chartHeight: computed(() => props.needScaleSize ? props.elementInfo.height * 10 : props.elementInfo.height),
+      needScaleSize,
+      zoom,
     }
   },
 })
@@ -82,8 +84,5 @@ export default defineComponent({
 .element-content {
   width: 100%;
   height: 100%;
-}
-.need-scale {
-  zoom: .1;
 }
 </style>

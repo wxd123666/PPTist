@@ -3,14 +3,14 @@
 </template>
 
 <script lang="ts">
-import { PropType } from 'vue'
-import { OperateBorderLine } from '@/types/edit'
+import { defineComponent, PropType } from 'vue'
+import { OperateBorderLines } from '@/types/edit'
 
-export default {
+export default defineComponent({
   name: 'border-line',
   props: {
     type: {
-      type: String as PropType<OperateBorderLine>,
+      type: String as PropType<OperateBorderLines>,
       required: true,
     },
     isWide: {
@@ -18,7 +18,7 @@ export default {
       default: false,
     },
   },
-}
+})
 </script>
 
 <style lang="scss" scoped>

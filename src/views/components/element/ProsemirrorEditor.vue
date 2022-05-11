@@ -13,7 +13,7 @@ import { useMainStore } from '@/store'
 import { EditorView } from 'prosemirror-view'
 import { toggleMark, wrapIn, selectAll } from 'prosemirror-commands'
 import { initProsemirrorEditor, createDocument } from '@/utils/prosemirror'
-import { getTextAttrs } from '@/utils/prosemirror/utils'
+import { findNodesWithSameMark, getTextAttrs, autoSelectAll, addMark, markActive } from '@/utils/prosemirror/utils'
 import emitter, { EmitterEvents, RichTextCommand } from '@/utils/emitter'
 import { alignmentCommand } from '@/utils/prosemirror/commands/setTextAlign'
 import { toggleList } from '@/utils/prosemirror/commands/toggleList'
@@ -66,7 +66,7 @@ export default defineComponent({
       if (props.value === '请输入内容') {
         setTimeout(() => {
           selectAll(editorView.state, editorView.dispatch)
-        }, 0)
+        }, 100)
       }
       mainStore.setDisableHotkeysState(true)
       emit('focus')
@@ -124,58 +124,47 @@ export default defineComponent({
     
     // 执行富文本命令（可以是一个或多个）
     // 部分命令在执行前先判断当前选区是否为空，如果选区为空先进行全选操作
-    const execCommand = (payload: RichTextCommand | RichTextCommand[]) => {
-      if (handleElementId.value !== props.elementId) return
+    const execCommand = ({ target, action }: RichTextCommand) => {
+      if (!target && handleElementId.value !== props.elementId) return
+      if (target && target !== props.elementId) return
 
-      const commands = ('command' in payload) ? [payload] : payload
+      const actions = ('command' in action) ? [action] : action
 
-      for (const item of commands) {
+      for (const item of actions) {
         if (item.command === 'fontname' && item.value) {
           const mark = editorView.state.schema.marks.fontname.create({ fontname: item.value })
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
-          const { $from, $to } = editorView.state.selection
-          editorView.dispatch(editorView.state.tr.addMark($from.pos, $to.pos, mark))
+          autoSelectAll(editorView)
+          addMark(editorView, mark)
         }
         else if (item.command === 'fontsize' && item.value) {
           const mark = editorView.state.schema.marks.fontsize.create({ fontsize: item.value })
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
-          const { $from, $to } = editorView.state.selection
-          editorView.dispatch(editorView.state.tr.addMark($from.pos, $to.pos, mark))
+          autoSelectAll(editorView)
+          addMark(editorView, mark)
         }
         else if (item.command === 'color' && item.value) {
           const mark = editorView.state.schema.marks.forecolor.create({ color: item.value })
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
-          const { $from, $to } = editorView.state.selection
-          editorView.dispatch(editorView.state.tr.addMark($from.pos, $to.pos, mark))
+          autoSelectAll(editorView)
+          addMark(editorView, mark)
         }
         else if (item.command === 'backcolor' && item.value) {
           const mark = editorView.state.schema.marks.backcolor.create({ backcolor: item.value })
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
-          const { $from, $to } = editorView.state.selection
-          editorView.dispatch(editorView.state.tr.addMark($from.pos, $to.pos, mark))
+          autoSelectAll(editorView)
+          addMark(editorView, mark)
         }
         else if (item.command === 'bold') {
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
+          autoSelectAll(editorView)
           toggleMark(editorView.state.schema.marks.strong)(editorView.state, editorView.dispatch)
         }
         else if (item.command === 'em') {
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
+          autoSelectAll(editorView)
           toggleMark(editorView.state.schema.marks.em)(editorView.state, editorView.dispatch)
         }
         else if (item.command === 'underline') {
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
+          autoSelectAll(editorView)
           toggleMark(editorView.state.schema.marks.underline)(editorView.state, editorView.dispatch)
         }
         else if (item.command === 'strikethrough') {
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
+          autoSelectAll(editorView)
           toggleMark(editorView.state.schema.marks.strikethrough)(editorView.state, editorView.dispatch)
         }
         else if (item.command === 'subscript') {
@@ -202,10 +191,32 @@ export default defineComponent({
           toggleList(orderedList, listItem)(editorView.state, editorView.dispatch)
         }
         else if (item.command === 'clear') {
-          const { empty } = editorView.state.selection
-          if (empty) selectAll(editorView.state, editorView.dispatch)
+          autoSelectAll(editorView)
           const { $from, $to } = editorView.state.selection
           editorView.dispatch(editorView.state.tr.removeMark($from.pos, $to.pos))
+        }
+        else if (item.command === 'link') {
+          const markType = editorView.state.schema.marks.link
+          const { from, to } = editorView.state.selection
+          const result = findNodesWithSameMark(editorView.state.doc, from, to, markType)
+          if (result) {
+            if (item.value) {
+              const mark = editorView.state.schema.marks.link.create({ href: item.value, title: item.value })
+              addMark(editorView, mark, { from: result.from.pos, to: result.to.pos + 1 })
+            }
+            else editorView.dispatch(editorView.state.tr.removeMark(result.from.pos, result.to.pos + 1, markType))
+          }
+          else if (markActive(editorView.state, markType)) {
+            if (item.value) {
+              const mark = editorView.state.schema.marks.link.create({ href: item.value, title: item.value })
+              addMark(editorView, mark)
+            }
+            else toggleMark(markType)(editorView.state, editorView.dispatch)
+          }
+          else if (item.value) {
+            autoSelectAll(editorView)
+            toggleMark(markType, { href: item.value, title: item.value })(editorView.state, editorView.dispatch)
+          }
         }
         else if (item.command === 'insert' && item.value) {
           editorView.dispatch(editorView.state.tr.insertText(item.value))

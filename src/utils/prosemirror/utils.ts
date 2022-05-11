@@ -1,6 +1,82 @@
-import { Node, NodeType, ResolvedPos, Mark } from 'prosemirror-model'
+import { Node, NodeType, ResolvedPos, Mark, MarkType } from 'prosemirror-model'
 import { EditorState, Selection } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
+import { selectAll } from 'prosemirror-commands'
+
+export const autoSelectAll = (view: EditorView) => {
+  const { empty } = view.state.selection
+  if (empty) selectAll(view.state, view.dispatch)
+}
+
+export const addMark = (editorView: EditorView, mark: Mark, selection?: { from: number; to: number; }) => {
+  if (selection) {
+    editorView.dispatch(editorView.state.tr.addMark(selection.from, selection.to, mark))
+  }
+  else {
+    const { $from, $to } = editorView.state.selection
+    editorView.dispatch(editorView.state.tr.addMark($from.pos, $to.pos, mark))
+  }
+}
+
+export const findNodesWithSameMark = (doc: Node, from: number, to: number, markType: MarkType) => {
+  let ii = from
+  const finder = (mark: Mark) => mark.type === markType
+  let firstMark = null
+  let fromNode = null
+  let toNode = null
+
+  while (ii <= to) {
+    const node = doc.nodeAt(ii)
+    if (!node || !node.marks) return null
+
+    const mark = node.marks.find(finder)
+    if (!mark) return null
+
+    if (firstMark && mark !== firstMark) return null
+
+    fromNode = fromNode || node
+    firstMark = firstMark || mark
+    toNode = node
+    ii++
+  }
+
+  let fromPos = from
+  let toPos = to
+
+  let jj = 0
+  ii = from - 1
+  while (ii > jj) {
+    const node = doc.nodeAt(ii)
+    const mark = node && node.marks.find(finder)
+    if (!mark || mark !== firstMark) break
+    fromPos = ii
+    fromNode = node
+    ii--
+  }
+
+  ii = to + 1
+  jj = doc.nodeSize - 2
+  while (ii < jj) {
+    const node = doc.nodeAt(ii)
+    const mark = node && node.marks.find(finder)
+    if (!mark || mark !== firstMark) break
+    toPos = ii
+    toNode = node
+    ii++
+  }
+
+  return {
+    mark: firstMark,
+    from: {
+      node: fromNode,
+      pos: fromPos,
+    },
+    to: {
+      node: toNode,
+      pos: toPos,
+    },
+  }
+}
 
 const equalNodeType = (nodeType: NodeType, node: Node) => {
   return Array.isArray(nodeType) && nodeType.indexOf(node.type) > -1 || node.type === nodeType
@@ -61,6 +137,12 @@ export const isActiveMark = (marks: Mark[], markType: string) => {
   return false
 }
 
+export const markActive = (state: EditorState, type: MarkType) => {
+  const { from, $from, to, empty } = state.selection
+  if (empty) return type.isInSet(state.storedMarks || $from.marks())
+  return state.doc.rangeHasMark(from, to, type)
+}
+
 export const getAttrValueInSelection = (view: EditorView, attr: string) => {
   const { selection, doc } = view.state
   const { from, to } = selection
@@ -107,6 +189,7 @@ export const getTextAttrs = (view: EditorView, defaultAttrs: DefaultAttrs = {}) 
   const backcolor = getAttrValue(marks, 'backcolor', 'backcolor') || defaultAttrs.backcolor
   const fontsize = getAttrValue(marks, 'fontsize', 'fontsize') || defaultAttrs.fontsize
   const fontname = getAttrValue(marks, 'fontname', 'fontname') || defaultAttrs.fontname
+  const link = getAttrValue(marks, 'link', 'href') || ''
   const align = getAttrValueInSelection(view, 'align') || defaultAttrs.align
   const isBulletList = isActiveOfParentNodeType('bullet_list', view.state)
   const isOrderedList = isActiveOfParentNodeType('ordered_list', view.state)
@@ -124,6 +207,7 @@ export const getTextAttrs = (view: EditorView, defaultAttrs: DefaultAttrs = {}) 
     backcolor: backcolor,
     fontsize: fontsize,
     fontname: fontname,
+    link: link,
     align: align,
     bulletList: isBulletList,
     orderedList: isOrderedList,
@@ -145,6 +229,7 @@ export const defaultRichTextAttrs: TextAttrs = {
   backcolor: '#000',
   fontsize: '20px',
   fontname: '微软雅黑',
+  link: '',
   align: 'left',
   bulletList: false,
   orderedList: false,

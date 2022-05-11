@@ -1,16 +1,12 @@
 import { ShapePoolItem } from '@/configs/shapes'
 import { LinePoolItem } from '@/configs/lines'
 
-export type ElementOrderCommand = 'up' | 'down' | 'top' | 'bottom'
-
 export const enum ElementOrderCommands {
   UP = 'up',
   DOWN = 'down',
   TOP = 'top',
   BOTTOM = 'bottom',
 }
-
-export type ElementAlignCommand = 'top'| 'bottom' | 'left' | 'right' | 'vertical' | 'horizontal' | 'center'
 
 export const enum ElementAlignCommands {
   TOP = 'top',
@@ -22,16 +18,12 @@ export const enum ElementAlignCommands {
   CENTER = 'center',
 }
 
-export type OperateBorderLine = 'top' | 'bottom' | 'left' | 'right'
-
 export const enum OperateBorderLines {
   T = 'top',
   B = 'bottom',
   L = 'left',
   R = 'right',
 }
-
-export type OperateResizeHandler = '' | 'left-top' | 'top' | 'right-top' | 'left' | 'right' | 'left-bottom' | 'bottom' | 'right-bottom'
 
 export const enum OperateResizeHandlers {
   LEFT_TOP = 'left-top',
@@ -44,12 +36,12 @@ export const enum OperateResizeHandlers {
   RIGHT_BOTTOM = 'right-bottom',
 }
 
-export type OperateLineHandler = 'start' | 'end' | 'mid'
-
 export const enum OperateLineHandlers {
   START = 'start',
   END = 'end',
-  MID = 'mid',
+  C = 'ctrl',
+  C1 = 'ctrl1',
+  C2 = 'ctrl2',
 }
 
 export interface AlignmentLineAxis {

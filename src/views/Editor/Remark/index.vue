@@ -32,7 +32,7 @@ export default defineComponent({
     
     const remark = computed(() => currentSlide.value?.remark || '')
 
-    const handleInput = (e: InputEvent) => {
+    const handleInput = (e: Event) => {
       const value = (e.target as HTMLTextAreaElement).value
       slidesStore.updateSlide({ remark: value })
     }
@@ -77,6 +77,7 @@ export default defineComponent({
   position: relative;
   border-top: 1px solid $borderColor;
   background-color: $lightGray;
+  line-height: 1.5;
 
   textarea {
     width: 100%;

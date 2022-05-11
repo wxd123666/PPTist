@@ -11,14 +11,13 @@
               height="18"
             >
               <g 
-                :transform="`scale(${18 / shape.viewBox}, ${18 / shape.viewBox}) translate(0,0) matrix(1,0,0,1,0,0)`"
+                :transform="`scale(${18 / shape.viewBox[0]}, ${18 / shape.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`"
               >
                 <path 
                   class="shape-path"
                   vector-effect="non-scaling-stroke" 
                   stroke-linecap="butt" 
                   stroke-miterlimit="8"
-                  stroke-linejoin
                   fill="transparent"
                   stroke="#999"
                   stroke-width="2" 
@@ -58,7 +57,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .shape-pool {
   width: 340px;
-  max-height: 540px;
+  max-height: 550px;
   overflow: auto;
   margin-bottom: -12px;
   margin-right: -12px;

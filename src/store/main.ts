@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { CreatingElement } from '@/types/edit'
-import { ToolbarState } from '@/types/toolbar'
+import { ToolbarStates } from '@/types/toolbar'
 import { SYS_FONTS } from '@/configs/font'
 import { TextAttrs, defaultRichTextAttrs } from '@/utils/prosemirror/utils'
 import { isSupportFont } from '@/utils/font'
@@ -13,18 +13,19 @@ export interface MainState {
   activeGroupElementId: string;
   canvasPercentage: number;
   canvasScale: number;
+  canvasDragged: boolean;
   thumbnailsFocus: boolean;
   editorAreaFocus: boolean;
   disableHotkeys: boolean;
   showGridLines: boolean;
+  showRuler: boolean;
   creatingElement: CreatingElement | null;
   availableFonts: typeof SYS_FONTS;
-  toolbarState: ToolbarState;
+  toolbarState: ToolbarStates;
   clipingImageElementId: string;
   isScaling: boolean;
   richTextAttrs: TextAttrs;
   selectedTableCells: string[];
-  editingShapeElementId: string;
   selectedSlidesIndex: number[];
 }
 
@@ -35,18 +36,19 @@ export const useMainStore = defineStore('main', {
     activeGroupElementId: '', // 组合元素成员中，被选中可独立操作的元素ID
     canvasPercentage: 90, // 画布可视区域百分比
     canvasScale: 1, // 画布缩放比例（基于宽度1000px）
+    canvasDragged: false, // 画布被拖拽移动
     thumbnailsFocus: false, // 左侧导航缩略图区域聚焦
     editorAreaFocus: false, //  编辑区域聚焦
     disableHotkeys: false, // 禁用快捷键
     showGridLines: false, // 显示网格线
+    showRuler: false, // 显示标尺
     creatingElement: null, // 正在插入的元素信息，需要通过绘制插入的元素（文字、形状、线条）
-    availableFonts: [], // 当前环境可用字体
-    toolbarState: 'slideDesign', // 右侧工具栏状态
+    availableFonts: SYS_FONTS, // 当前环境可用字体
+    toolbarState: ToolbarStates.SLIDE_DESIGN, // 右侧工具栏状态
     clipingImageElementId: '', // 当前正在裁剪的图片ID  
     richTextAttrs: defaultRichTextAttrs, // 富文本状态
     selectedTableCells: [], // 选中的表格单元格
     isScaling: false, // 正在进行元素缩放
-    editingShapeElementId: '', // 当前正处在编辑文字状态的形状ID  
     selectedSlidesIndex: [], // 当前被选中的页面索引集合
   }),
 
@@ -90,6 +92,10 @@ export const useMainStore = defineStore('main', {
       this.canvasScale = scale
     },
   
+    setCanvasDragged(isDragged: boolean) {
+      this.canvasDragged = isDragged
+    },
+  
     setThumbnailsFocus(isFocus: boolean) {
       this.thumbnailsFocus = isFocus
     },
@@ -106,6 +112,10 @@ export const useMainStore = defineStore('main', {
       this.showGridLines = show
     },
   
+    setRulerState(show: boolean) {
+      this.showRuler = show
+    },
+  
     setCreatingElement(element: CreatingElement | null) {
       this.creatingElement = element
     },
@@ -114,7 +124,7 @@ export const useMainStore = defineStore('main', {
       this.availableFonts = SYS_FONTS.filter(font => isSupportFont(font.value))
     },
   
-    setToolbarState(toolbarState: ToolbarState) {
+    setToolbarState(toolbarState: ToolbarStates) {
       this.toolbarState = toolbarState
     },
   
@@ -132,10 +142,6 @@ export const useMainStore = defineStore('main', {
   
     setScalingState(isScaling: boolean) {
       this.isScaling = isScaling
-    },
-  
-    setEditingShapeElementId(ellId: string) {
-      this.editingShapeElementId = ellId
     },
     
     updateSelectedSlidesIndex(selectedSlidesIndex: number[]) {

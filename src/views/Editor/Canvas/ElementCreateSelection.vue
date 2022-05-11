@@ -5,11 +5,11 @@
     @mousedown.stop="$event => createSelection($event)"
     @contextmenu.stop.prevent
   >
-    <div :class="['selection', creatingElement.type]" v-if="start && end" :style="position">
+    <div :class="['selection', creatingElement?.type]" v-if="start && end" :style="position">
 
       <!-- 绘制线条专用 -->
       <svg
-        v-if="creatingElement.type === 'line' && lineData"
+        v-if="creatingElement?.type === 'line' && lineData"
         overflow="visible" 
         :width="lineData.svgWidth"
         :height="lineData.svgHeight"
@@ -18,10 +18,7 @@
           :d="lineData.path" 
           stroke="#d14424" 
           fill="none" 
-          stroke-width="1" 
-          stroke-linecap 
-          stroke-linejoin 
-          stroke-miterlimit 
+          stroke-width="2" 
         ></path>
 			</svg>
     </div>
@@ -29,7 +26,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useKeyboardStore } from '@/store'
 
@@ -45,15 +42,14 @@ export default defineComponent({
     const end = ref<[number, number]>()
 
     const selectionRef = ref<HTMLElement>()
-    const offset = reactive({
+    const offset = ref({
       x: 0,
       y: 0,
     })
     onMounted(() => {
       if (!selectionRef.value) return
       const { x, y } = selectionRef.value.getBoundingClientRect()
-      offset.x = x
-      offset.y = y
+      offset.value = { x, y }
     })
 
     // 鼠标拖动创建元素生成位置大小
@@ -201,8 +197,8 @@ export default defineComponent({
       const height = maxY - minY
 
       return {
-        left: minX - offset.x + 'px',
-        top: minY - offset.y + 'px',
+        left: minX - offset.value.x + 'px',
+        top: minY - offset.value.y + 'px',
         width: width + 'px',
         height: height + 'px',
       }
@@ -230,6 +226,10 @@ export default defineComponent({
   height: 100%;
   z-index: 2;
   cursor: crosshair;
+
+  svg {
+    overflow: visible;
+  }
 }
 .selection {
   position: absolute;

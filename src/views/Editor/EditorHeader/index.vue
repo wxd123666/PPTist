@@ -7,6 +7,7 @@
           <Menu>
             <MenuItem @click="exportJSON()">导出 JSON</MenuItem>
             <MenuItem @click="exportPPTX()">导出 PPTX</MenuItem>
+            <MenuItem @click="exportImgDialogVisible = true">导出图片</MenuItem>
           </Menu>
         </template>
       </Dropdown>
@@ -19,6 +20,7 @@
             <MenuItem @click="createSlide()">添加页面</MenuItem>
             <MenuItem @click="deleteSlide()">删除页面</MenuItem>
             <MenuItem @click="toggleGridLines()">{{ showGridLines ? '关闭网格线' : '打开网格线' }}</MenuItem>
+            <MenuItem @click="toggleRuler()">{{ showRuler ? '关闭标尺' : '打开标尺' }}</MenuItem>
             <MenuItem @click="resetSlides()">重置幻灯片</MenuItem>
           </Menu>
         </template>
@@ -63,6 +65,17 @@
       <HotkeyDoc />
     </Drawer>
 
+    <Modal
+      v-model:visible="exportImgDialogVisible" 
+      :footer="null" 
+      centered
+      :closable="false"
+      :width="680"
+      destroyOnClose
+    >
+      <ExportImgDialog @close="exportImgDialogVisible = false"/>
+    </Modal>
+
     <FullscreenSpin :loading="exporting" tip="正在导出..." />
   </div>
 </template>
@@ -77,15 +90,17 @@ import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import useExport from '@/hooks/useExport'
 
 import HotkeyDoc from './HotkeyDoc.vue'
+import ExportImgDialog from './ExportImgDialog.vue'
 
 export default defineComponent({
   name: 'editor-header',
   components: {
     HotkeyDoc,
+    ExportImgDialog,
   },
   setup() {
     const mainStore = useMainStore()
-    const { showGridLines } = storeToRefs(mainStore)
+    const { showGridLines, showRuler } = storeToRefs(mainStore)
 
     const { enterScreening, enterScreeningFromStart } = useScreening()
     const { createSlide, deleteSlide, resetSlides } = useSlideHandler()
@@ -96,7 +111,12 @@ export default defineComponent({
       mainStore.setGridLinesState(!showGridLines.value)
     }
 
+    const toggleRuler = () => {
+      mainStore.setRulerState(!showRuler.value)
+    }
+
     const hotkeyDrawerVisible = ref(false)
+    const exportImgDialogVisible = ref(false)
 
     const goIssues = () => {
       window.open('https://github.com/pipipi-pikachu/PPTist/issues')
@@ -106,13 +126,16 @@ export default defineComponent({
       redo,
       undo,
       showGridLines,
+      showRuler,
       hotkeyDrawerVisible,
+      exportImgDialogVisible,
       exporting,
       enterScreening,
       enterScreeningFromStart,
       createSlide,
       deleteSlide,
       toggleGridLines,
+      toggleRuler,
       resetSlides,
       exportJSON,
       exportPPTX,

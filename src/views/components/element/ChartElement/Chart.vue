@@ -27,18 +27,16 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, onMounted, PropType, ref, Ref, watch } from 'vue'
+import { computed, defineComponent, inject, onMounted, PropType, ref, watch } from 'vue'
 import { upperFirst } from 'lodash'
 import tinycolor from 'tinycolor2'
 import Chartist, {
   IChartistLineChart,
   IChartistBarChart,
   IChartistPieChart,
-  ILineChartOptions,
-  IBarChartOptions,
-  IPieChartOptions,
 } from 'chartist'
-import { ChartData, ChartType } from '@/types/slides'
+import { ChartData, ChartOptions, ChartType } from '@/types/slides'
+import { injectKeySlideScale } from '@/types/injectKey'
 
 import 'chartist/dist/scss/chartist.scss'
 
@@ -62,7 +60,7 @@ export default defineComponent({
       required: true,
     },
     options: {
-      type: Object as PropType<ILineChartOptions & IBarChartOptions & IPieChartOptions>,
+      type: Object as PropType<ChartOptions>,
     },
     themeColor: {
       type: Array as PropType<string[]>,
@@ -81,7 +79,7 @@ export default defineComponent({
   },
   setup(props) {
     const chartRef = ref<HTMLElement>()
-    const slideScale: Ref<number> = inject('slideScale') || ref(1)
+    const slideScale = inject(injectKeySlideScale) || ref(1)
 
     let chart: IChartistLineChart | IChartistBarChart | IChartistPieChart | undefined
 
@@ -122,6 +120,7 @@ export default defineComponent({
       () => props.width,
       () => props.height,
       () => props.data,
+      () => props.options,
       slideScale,
     ], updateChart)
 
