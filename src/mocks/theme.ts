@@ -4,5 +4,5 @@ export const theme: SlideTheme = {
   themeColor: '#5b9bd5',
   fontColor: '#333',
   fontName: 'Microsoft Yahei',
-  backgroundColor: '#fff',
+  backgroundColor: '#f1f1f1',
 }
