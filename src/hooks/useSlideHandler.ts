@@ -10,18 +10,20 @@ import { KEYS } from '@/configs/hotkey'
 import { message } from 'ant-design-vue'
 import usePasteTextClipboardData from '@/hooks/usePasteTextClipboardData'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
+import useAddSlidesOrElements from '@/hooks//useAddSlidesOrElements'
 
 export default () => {
   const mainStore = useMainStore()
   const slidesStore = useSlidesStore()
-  const { selectedSlidesIndex: _selectedSlidesIndex } = storeToRefs(mainStore)
+  const { selectedSlidesIndex: _selectedSlidesIndex, activeElementIdList } = storeToRefs(mainStore)
   const { currentSlide, slides, theme, slideIndex } = storeToRefs(slidesStore)
 
   const selectedSlidesIndex = computed(() => [..._selectedSlidesIndex.value, slideIndex.value])
   const selectedSlides = computed(() => slides.value.filter((item, index) => selectedSlidesIndex.value.includes(index)))
   const selectedSlidesId = computed(() => selectedSlides.value.map(item => item.id))
 
-  const { pasteTextClipboardData, addSlidesFromClipboard } = usePasteTextClipboardData()
+  const { pasteTextClipboardData } = usePasteTextClipboardData()
+  const { addSlidesFromData } = useAddSlidesOrElements()
   const { addHistorySnapshot } = useHistorySnapshot()
 
   // 重置幻灯片
@@ -45,9 +47,11 @@ export default () => {
    */
   const updateSlideIndex = (command: string) => {
     if (command === KEYS.UP && slideIndex.value > 0) {
+      if (activeElementIdList.value.length) mainStore.setActiveElementIdList([])
       slidesStore.updateSlideIndex(slideIndex.value - 1)
     }
     else if (command === KEYS.DOWN && slideIndex.value < slides.value.length - 1) {
+      if (activeElementIdList.value.length) mainStore.setActiveElementIdList([])
       slidesStore.updateSlideIndex(slideIndex.value + 1)
     }
   }
@@ -106,7 +110,7 @@ export default () => {
   // 将当前页复制一份到下一页
   const copyAndPasteSlide = () => {
     const slide = JSON.parse(JSON.stringify(currentSlide.value))
-    addSlidesFromClipboard([slide])
+    addSlidesFromData([slide])
   }
 
   // 删除当前页，若将删除全部页面，则执行重置幻灯片操作

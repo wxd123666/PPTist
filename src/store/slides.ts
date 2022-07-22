@@ -1,26 +1,31 @@
 import { defineStore } from 'pinia'
 import tinycolor from 'tinycolor2'
 import { omit } from 'lodash'
-import { Slide, SlideTheme, PPTElement } from '@/types/slides'
+import { Slide, SlideTheme, PPTElement, PPTAnimation } from '@/types/slides'
 import { slides } from '@/mocks/slides'
 import { theme } from '@/mocks/theme'
 import { layouts } from '@/mocks/layout'
 
 interface RemoveElementPropData {
-  id: string;
-  propName: string | string[];
+  id: string
+  propName: string | string[]
 }
 
 interface UpdateElementData {
-  id: string | string[];
-  props: Partial<PPTElement>;
+  id: string | string[]
+  props: Partial<PPTElement>
+}
+
+interface FormatedAnimation {
+  animations: PPTAnimation[]
+  autoNext: boolean
 }
 
 export interface SlidesState {
-  theme: SlideTheme;
-  slides: Slide[];
-  slideIndex: number;
-  viewportRatio: number;
+  theme: SlideTheme
+  slides: Slide[]
+  slideIndex: number
+  viewportRatio: number
 }
 
 export const useSlidesStore = defineStore('slides', {
@@ -38,13 +43,43 @@ export const useSlidesStore = defineStore('slides', {
   
     currentSlideAnimations(state) {
       const currentSlide = state.slides[state.slideIndex]
-      if (!currentSlide) return null
-      const animations = currentSlide.animations
-      if (!animations) return null
-  
+      if (!currentSlide?.animations) return []
+
       const els = currentSlide.elements
       const elIds = els.map(el => el.id)
-      return animations.filter(animation => elIds.includes(animation.elId))
+      return currentSlide.animations.filter(animation => elIds.includes(animation.elId))
+    },
+
+    // 格式化的当前页动画
+    // 将触发条件为“与上一动画同时”的项目向上合并到序列中的同一位置
+    // 为触发条件为“上一动画之后”项目的上一项添加自动向下执行标记
+    formatedAnimations(state) {
+      const currentSlide = state.slides[state.slideIndex]
+      if (!currentSlide?.animations) return []
+
+      const els = currentSlide.elements
+      const elIds = els.map(el => el.id)
+      const animations = currentSlide.animations.filter(animation => elIds.includes(animation.elId))
+
+      const formatedAnimations: FormatedAnimation[] = []
+      for (const animation of animations) {
+        if (animation.trigger === 'click' || !formatedAnimations.length) {
+          formatedAnimations.push({ animations: [animation], autoNext: false })
+        }
+        else if (animation.trigger === 'meantime') {
+          const last = formatedAnimations[formatedAnimations.length - 1]
+          last.animations = last.animations.filter(item => item.elId !== animation.elId)
+          last.animations.push(animation)
+          formatedAnimations[formatedAnimations.length - 1] = last
+        }
+        else if (animation.trigger === 'auto') {
+          const last = formatedAnimations[formatedAnimations.length - 1]
+          last.autoNext = true
+          formatedAnimations[formatedAnimations.length - 1] = last
+          formatedAnimations.push({ animations: [animation], autoNext: false })
+        }
+      }
+      return formatedAnimations
     },
   
     layouts(state) {
@@ -118,6 +153,13 @@ export const useSlidesStore = defineStore('slides', {
       const elements = Array.isArray(element) ? element : [element]
       const currentSlideEls = this.slides[this.slideIndex].elements
       const newEls = [...currentSlideEls, ...elements]
+      this.slides[this.slideIndex].elements = newEls
+    },
+
+    deleteElement(elementId: string | string[]) {
+      const elementIdList = Array.isArray(elementId) ? elementId : [elementId]
+      const currentSlideEls = this.slides[this.slideIndex].elements
+      const newEls = currentSlideEls.filter(item => !elementIdList.includes(item.id))
       this.slides[this.slideIndex].elements = newEls
     },
   

@@ -24,7 +24,8 @@
         }"
         v-contextmenu="contextmenus"
         @mousedown="$event => handleSelectElement($event)"
-        @dblclick="editable = true"
+        @touchstart="$event => handleSelectElement($event)"
+        @dblclick="startEdit()"
       >
         <svg 
           overflow="visible" 
@@ -48,7 +49,6 @@
               vector-effect="non-scaling-stroke" 
               stroke-linecap="butt" 
               stroke-miterlimit="8"
-              stroke-linejoin="" 
               :d="elementInfo.path" 
               :fill="elementInfo.gradient ? `url(#editabel-gradient-${elementInfo.id})` : elementInfo.fill"
               :stroke="outlineColor"
@@ -60,15 +60,17 @@
 
         <div class="shape-text" :class="[text.align, { 'editable': editable || text.content }]">
           <ProsemirrorEditor
+            ref="prosemirrorEditorRef"
             v-if="editable || text.content"
             :elementId="elementInfo.id"
             :defaultColor="text.defaultColor"
             :defaultFontName="text.defaultFontName"
             :editable="!elementInfo.lock"
-            :autoFocus="true"
             :value="text.content"
             @update="value => updateText(value)"
+            @blur="checkEmptyText()"
             @mousedown="$event => handleSelectElement($event, false)"
+            @touchstart="$event => handleSelectElement($event, false)"
           />
         </div>
       </div>
@@ -76,8 +78,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { computed, defineComponent, PropType, ref, watch } from 'vue'
+<script lang="ts" setup>
+import { computed, nextTick, PropType, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import { PPTShapeElement, ShapeText } from '@/types/slides'
@@ -90,92 +92,88 @@ import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import GradientDefs from './GradientDefs.vue'
 import ProsemirrorEditor from '@/views/components/element/ProsemirrorEditor.vue'
 
-export default defineComponent({
-  name: 'editable-element-shape',
-  components: {
-    GradientDefs,
-    ProsemirrorEditor,
+const props = defineProps({
+  elementInfo: {
+    type: Object as PropType<PPTShapeElement>,
+    required: true,
   },
-  props: {
-    elementInfo: {
-      type: Object as PropType<PPTShapeElement>,
-      required: true,
-    },
-    selectElement: {
-      type: Function as PropType<(e: MouseEvent, element: PPTShapeElement, canMove?: boolean) => void>,
-      required: true,
-    },
-    contextmenus: {
-      type: Function as PropType<() => ContextmenuItem[]>,
-    },
+  selectElement: {
+    type: Function as PropType<(e: MouseEvent | TouchEvent, element: PPTShapeElement, canMove?: boolean) => void>,
+    required: true,
   },
-  setup(props) {
-    const mainStore = useMainStore()
-    const slidesStore = useSlidesStore()
-    const { handleElementId } = storeToRefs(mainStore)
-
-    const { addHistorySnapshot } = useHistorySnapshot()
-
-    const handleSelectElement = (e: MouseEvent, canMove = true) => {
-      if (props.elementInfo.lock) return
-      e.stopPropagation()
-
-      props.selectElement(e, props.elementInfo, canMove)
-    }
-
-    const outline = computed(() => props.elementInfo.outline)
-    const { outlineWidth, outlineStyle, outlineColor } = useElementOutline(outline)
-    
-    const shadow = computed(() => props.elementInfo.shadow)
-    const { shadowStyle } = useElementShadow(shadow)
-
-    const flipH = computed(() => props.elementInfo.flipH)
-    const flipV = computed(() => props.elementInfo.flipV)
-    const { flipStyle } = useElementFlip(flipH, flipV)
-
-    const editable = ref(false)
-    
-    watch(handleElementId, () => {
-      if (handleElementId.value !== props.elementInfo.id) {
-        if (editable.value) editable.value = false
-      }
-    })
-
-    const text = computed<ShapeText>(() => {
-      const defaultText: ShapeText = {
-        content: '',
-        defaultFontName: '微软雅黑',
-        defaultColor: '#000',
-        align: 'middle',
-      }
-      if (!props.elementInfo.text) return defaultText
-
-      return props.elementInfo.text
-    })
-
-    const updateText = (content: string) => {
-      const _text = { ...text.value, content }
-      slidesStore.updateElement({
-        id: props.elementInfo.id, 
-        props: { text: _text },
-      })
-      
-      addHistorySnapshot()
-    }
-
-    return {
-      shadowStyle,
-      outlineWidth,
-      outlineStyle,
-      outlineColor,
-      flipStyle,
-      editable,
-      text,
-      handleSelectElement,
-      updateText,
-    }
+  contextmenus: {
+    type: Function as PropType<() => ContextmenuItem[] | null>,
   },
 })
+
+const mainStore = useMainStore()
+const slidesStore = useSlidesStore()
+const { handleElementId } = storeToRefs(mainStore)
+
+const { addHistorySnapshot } = useHistorySnapshot()
+
+const handleSelectElement = (e: MouseEvent | TouchEvent, canMove = true) => {
+  if (props.elementInfo.lock) return
+  e.stopPropagation()
+
+  props.selectElement(e, props.elementInfo, canMove)
+}
+
+const outline = computed(() => props.elementInfo.outline)
+const { outlineWidth, outlineStyle, outlineColor } = useElementOutline(outline)
+
+const shadow = computed(() => props.elementInfo.shadow)
+const { shadowStyle } = useElementShadow(shadow)
+
+const flipH = computed(() => props.elementInfo.flipH)
+const flipV = computed(() => props.elementInfo.flipV)
+const { flipStyle } = useElementFlip(flipH, flipV)
+
+const editable = ref(false)
+
+watch(handleElementId, () => {
+  if (handleElementId.value !== props.elementInfo.id) {
+    if (editable.value) editable.value = false
+  }
+})
+
+const text = computed<ShapeText>(() => {
+  const defaultText: ShapeText = {
+    content: '',
+    defaultFontName: '微软雅黑',
+    defaultColor: '#000',
+    align: 'middle',
+  }
+  if (!props.elementInfo.text) return defaultText
+
+  return props.elementInfo.text
+})
+
+const updateText = (content: string) => {
+  const _text = { ...text.value, content }
+  slidesStore.updateElement({
+    id: props.elementInfo.id, 
+    props: { text: _text },
+  })
+  
+  addHistorySnapshot()
+}
+
+const checkEmptyText = () => {
+  if (!props.elementInfo.text) return
+
+  const pureText = props.elementInfo.text.content.replaceAll(/<[^>]+>/g, '')
+  if (!pureText) {
+    slidesStore.removeElementProps({ id: props.elementInfo.id, propName: 'text' })
+    addHistorySnapshot()
+  }
+}
+
+const prosemirrorEditorRef = ref<typeof ProsemirrorEditor>()
+const startEdit = () => {
+  editable.value = true
+  nextTick(() => prosemirrorEditorRef.value && prosemirrorEditorRef.value.focus())
+}
 </script>
 
 <style lang="scss" scoped>

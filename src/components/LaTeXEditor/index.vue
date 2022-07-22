@@ -59,91 +59,88 @@
       </div>
     </div>
     <div class="footer">
-      <Button class="btn" @click="close()">取消</Button>
+      <Button class="btn" @click="emit('close')">取消</Button>
       <Button class="btn" type="primary" @click="update()">确定</Button>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { computed, defineComponent, onMounted, ref } from 'vue'
+<script lang="ts" setup>
+import { computed, onMounted, ref } from 'vue'
 import { hfmath } from './hfmath'
 import { FORMULA_LIST, SYMBOL_LIST } from '@/configs/latex'
 
 import FormulaContent from './FormulaContent.vue'
 import SymbolContent from './SymbolContent.vue'
 
-const tabs = [
+import { message } from 'ant-design-vue'
+
+interface Tab {
+  label: string
+  value: 'symbol' | 'formula'
+}
+
+const tabs: Tab[] = [
   { label: '常用符号', value: 'symbol' },
   { label: '预置公式', value: 'formula' },
 ]
 
-export default defineComponent({
-  name: 'latex-editor',
-  emits: ['update', 'close'],
-  components: {
-    FormulaContent,
-    SymbolContent,
-  },
-  props: {
-    value: {
-      type: String,
-      default: '',
-    },
-  },
-  setup(props, { emit }) {
-    const latex = ref('')
-    const toolbarState = ref('symbol')
-    const textAreaRef = ref<HTMLTextAreaElement>()
+interface LatexResult {
+  latex: string
+  path: string
+  w: number
+  h: number
+}
 
-    const selectedSymbolKey = ref(SYMBOL_LIST[0].type)
-    const symbolPool = computed(() => {
-      const selectedSymbol = SYMBOL_LIST.find(item => item.type === selectedSymbolKey.value)
-      return selectedSymbol?.children || []
-    })
-
-    onMounted(() => {
-      if (props.value) latex.value = props.value
-    })
-
-    const update = () => {
-      if (!latex.value) return
-
-      const eq = new hfmath(latex.value)
-      const pathd = eq.pathd({})
-      const box = eq.box({})
-      
-      emit('update', {
-        latex: latex.value,
-        path: pathd,
-        w: box.w + 32,
-        h: box.h + 32,
-      })
-    }
-
-    const close = () => emit('close')
-
-    const insertSymbol = (latex: string) => {
-      if (!textAreaRef.value) return
-      textAreaRef.value.focus()
-      document.execCommand('insertText', false, latex)
-    }
-
-    return {
-      tabs,
-      latex,
-      toolbarState,
-      selectedSymbolKey,
-      formulaList: FORMULA_LIST,
-      symbolList: SYMBOL_LIST,
-      symbolPool,
-      textAreaRef,
-      update,
-      close,
-      insertSymbol,
-    }
+const props = defineProps({
+  value: {
+    type: String,
+    default: '',
   },
 })
+
+const emit = defineEmits<{
+  (event: 'update', payload: LatexResult): void
+  (event: 'close'): void
+}>()
+
+const formulaList = FORMULA_LIST
+const symbolList = SYMBOL_LIST
+
+const latex = ref('')
+const toolbarState = ref<'symbol' | 'formula'>('symbol')
+const textAreaRef = ref<HTMLTextAreaElement>()
+
+const selectedSymbolKey = ref(SYMBOL_LIST[0].type)
+const symbolPool = computed(() => {
+  const selectedSymbol = SYMBOL_LIST.find(item => item.type === selectedSymbolKey.value)
+  return selectedSymbol?.children || []
+})
+
+onMounted(() => {
+  if (props.value) latex.value = props.value
+})
+
+const update = () => {
+  if (!latex.value) return message.error('公式不能为空')
+
+  const eq = new hfmath(latex.value)
+  const pathd = eq.pathd({})
+  const box = eq.box({})
+  
+  emit('update', {
+    latex: latex.value,
+    path: pathd,
+    w: box.w + 32,
+    h: box.h + 32,
+  })
+}
+
+const insertSymbol = (latex: string) => {
+  if (!textAreaRef.value) return
+  textAreaRef.value.focus()
+  document.execCommand('insertText', false, latex)
+}
 </script>
 
 <style lang="scss" scoped>

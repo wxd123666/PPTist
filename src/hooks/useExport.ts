@@ -6,21 +6,26 @@ import pptxgen from 'pptxgenjs'
 import tinycolor from 'tinycolor2'
 import { toPng, toJpeg } from 'html-to-image'
 import { useSlidesStore } from '@/store'
-import { PPTElementOutline, PPTElementShadow, PPTElementLink } from '@/types/slides'
+import { PPTElementOutline, PPTElementShadow, PPTElementLink, Slide } from '@/types/slides'
 import { getElementRange, getLineElementPath, getTableSubThemeColor } from '@/utils/element'
 import { AST, toAST } from '@/utils/htmlParser'
 import { SvgPoints, toPoints } from '@/utils/svgPathParser'
+import { decrypt, encrypt } from '@/utils/crypto'
 import { svg2Base64 } from '@/utils/svg2Base64'
 import { message } from 'ant-design-vue'
+import useAddSlidesOrElements from '@/hooks/useAddSlidesOrElements'
 
 interface ExportImageConfig {
-  quality: number;
-  width: number;
-  fontEmbedCSS?: string;
+  quality: number
+  width: number
+  fontEmbedCSS?: string
 }
 
 export default () => {
-  const { slides, theme } = storeToRefs(useSlidesStore())
+  const slidesStore = useSlidesStore()
+  const { slides, theme, viewportRatio } = storeToRefs(slidesStore)
+
+  const { addSlidesFromData } = useAddSlidesOrElements()
 
   const exporting = ref(false)
 
@@ -50,6 +55,30 @@ export default () => {
     }, 200)
   }
   
+  // 导出pptist文件（特有 .pptist 后缀文件）
+  const exportSpecificFile = (_slides: Slide[]) => {
+    const blob = new Blob([encrypt(JSON.stringify(_slides))], { type: '' })
+    saveAs(blob, 'pptist_slides.pptist')
+  }
+  
+  // 导入pptist文件
+  const importSpecificFile = (files: FileList, cover = false) => {
+    const file = files[0]
+
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      try {
+        const slides = JSON.parse(decrypt(reader.result as string))
+        if (cover) slidesStore.setSlides(slides)
+        else addSlidesFromData(slides)
+      }
+      catch {
+        message.error('无法正确读取 / 解析该文件')
+      }
+    })
+    reader.readAsText(file)
+  }
+  
   // 导出JSON文件
   const exportJSON = () => {
     const blob = new Blob([JSON.stringify(slides.value)], { type: '' })
@@ -74,6 +103,7 @@ export default () => {
   const formatHTML = (html: string) => {
     const ast = toAST(html)
     let bulletFlag = false
+    let indent = 0
 
     const slices: pptxgen.TextProps[] = []
     const parse = (obj: AST[], baseStyleObj = {}) => {
@@ -123,6 +153,12 @@ export default () => {
           }
           if (item.tagName === 'li') {
             bulletFlag = true
+          }
+          if (item.tagName === 'p') {
+            if ('attributes' in item) {
+              const dataIndentAttr = item.attributes.find(attr => attr.key === 'data-indent')
+              if (dataIndentAttr && dataIndentAttr.value) indent = +dataIndentAttr.value
+            }
           }
         }
 
@@ -176,11 +212,17 @@ export default () => {
 
           if (bulletFlag && styleObj['list-type'] === 'ol') {
             options.bullet = { type: 'number', indent: 20 * 0.75 }
+            options.paraSpaceBefore = 0.1
             bulletFlag = false
           }
           if (bulletFlag && styleObj['list-type'] === 'ul') {
             options.bullet = { indent: 20 * 0.75 }
+            options.paraSpaceBefore = 0.1
             bulletFlag = false
+          }
+          if (indent) {
+            options.indentLevel = indent
+            indent = 0
           }
 
           slices.push({ text, options })
@@ -329,17 +371,23 @@ export default () => {
   }
 
   // 导出PPTX文件
-  const exportPPTX = () => {
+  const exportPPTX = (_slides: Slide[], masterOverwrite: boolean) => {
     exporting.value = true
     const pptx = new pptxgen()
 
-    const { color: bgColor, alpha: bgAlpha } = formatColor(theme.value.backgroundColor)
-    pptx.defineSlideMaster({
-      title: 'PPTIST_MASTER',
-      background: { color: bgColor, transparency: (1 - bgAlpha) * 100 },
-    })
+    if (viewportRatio.value === 0.625) pptx.layout = 'LAYOUT_16x10'
+    else if (viewportRatio.value === 0.75) pptx.layout = 'LAYOUT_4x3'
+    else pptx.layout = 'LAYOUT_16x9'
 
-    for (const slide of slides.value) {
+    if (masterOverwrite) {
+      const { color: bgColor, alpha: bgAlpha } = formatColor(theme.value.backgroundColor)
+      pptx.defineSlideMaster({
+        title: 'PPTIST_MASTER',
+        background: { color: bgColor, transparency: (1 - bgAlpha) * 100 },
+      })
+    }
+
+    for (const slide of _slides) {
       const pptxSlide = pptx.addSlide()
 
       if (slide.background) {
@@ -374,13 +422,15 @@ export default () => {
             fontSize: 20 * 0.75,
             fontFace: '微软雅黑',
             color: '#000000',
-            valign: 'middle',
+            valign: 'top',
             margin: 10 * 0.75,
-            lineSpacingMultiple: 1.5 / 1.2,
+            paraSpaceBefore: 5 * 0.75,
+            lineSpacingMultiple: 1.5 / 1.25,
+            autoFit: true,
           }
           if (el.rotate) options.rotate = el.rotate
           if (el.wordSpace) options.charSpacing = el.wordSpace * 0.75
-          if (el.lineHeight) options.lineSpacingMultiple = el.lineHeight / 1.2
+          if (el.lineHeight) options.lineSpacingMultiple = el.lineHeight / 1.25
           if (el.fill) {
             const c = formatColor(el.fill)
             const opacity = el.opacity === undefined ? 1 : el.opacity
@@ -391,6 +441,7 @@ export default () => {
           if (el.shadow) options.shadow = getShadowOption(el.shadow)
           if (el.outline?.width) options.line = getOutlineOption(el.outline)
           if (el.opacity !== undefined) options.transparency = (1 - el.opacity) * 100
+          if (el.paragraphSpace !== undefined) options.paraSpaceBefore = el.paragraphSpace * 0.75
 
           pptxSlide.addText(textProps, options)
         }
@@ -496,6 +547,7 @@ export default () => {
               fontSize: 20 * 0.75,
               fontFace: '微软雅黑',
               color: '#000000',
+              paraSpaceBefore: 5 * 0.75,
               valign: el.text.align,
             }
             if (el.rotate) options.rotate = el.rotate
@@ -715,6 +767,8 @@ export default () => {
     exporting,
     exportImage,
     exportJSON,
+    importSpecificFile,
+    exportSpecificFile,
     exportPPTX,
   }
 }

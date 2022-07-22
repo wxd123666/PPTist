@@ -5,9 +5,14 @@
         <div class="menu-item"><IconFolderClose /> <span class="text">文件</span></div>
         <template #overlay>
           <Menu>
-            <MenuItem @click="exportJSON()">导出 JSON</MenuItem>
-            <MenuItem @click="exportPPTX()">导出 PPTX</MenuItem>
-            <MenuItem @click="exportImgDialogVisible = true">导出图片</MenuItem>
+            <FileInput accept=".pptist"  @change="files => importSpecificFile(files)">
+              <MenuItem>导入 pptist 文件</MenuItem>
+            </FileInput>
+            <MenuItem @click="setDialogForExport('pptist')">导出 pptist 文件</MenuItem>
+            <MenuItem @click="setDialogForExport('pptx')">导出 PPTX</MenuItem>
+            <MenuItem @click="setDialogForExport('image')">导出图片</MenuItem>
+            <MenuItem @click="setDialogForExport('json')">导出 JSON</MenuItem>
+            <MenuItem @click="setDialogForExport('pdf')">打印 / 导出 PDF</MenuItem>
           </Menu>
         </template>
       </Dropdown>
@@ -19,7 +24,7 @@
             <MenuItem @click="redo()">重做</MenuItem>
             <MenuItem @click="createSlide()">添加页面</MenuItem>
             <MenuItem @click="deleteSlide()">删除页面</MenuItem>
-            <MenuItem @click="toggleGridLines()">{{ showGridLines ? '关闭网格线' : '打开网格线' }}</MenuItem>
+            <MenuItem @click="toggleGridLines()">{{ gridLineSize ? '关闭网格线' : '打开网格线' }}</MenuItem>
             <MenuItem @click="toggleRuler()">{{ showRuler ? '关闭标尺' : '打开标尺' }}</MenuItem>
             <MenuItem @click="resetSlides()">重置幻灯片</MenuItem>
           </Menu>
@@ -46,9 +51,14 @@
     </div>
 
     <div class="right">
+      <Tooltip :mouseLeaveDelay="0" title="导出">
+        <div class="menu-item" @click="setDialogForExport('pptx')">
+          <IconShare size="18" fill="#666" />
+        </div>
+      </Tooltip>
       <Tooltip :mouseLeaveDelay="0" title="幻灯片放映">
         <div class="menu-item" @click="enterScreening()">
-          <IconPpt size="18" fill="#666" style="margin-top: 2px;" />
+          <IconPpt size="19" fill="#666" style="margin-top: 1px;" />
         </div>
       </Tooltip>
       <a href="https://github.com/pipipi-pikachu/PPTist" target="_blank">
@@ -59,29 +69,17 @@
     <Drawer
       width="320"
       placement="right"
+      :closable="false"
       :visible="hotkeyDrawerVisible"
       @close="hotkeyDrawerVisible = false"
     >
       <HotkeyDoc />
     </Drawer>
-
-    <Modal
-      v-model:visible="exportImgDialogVisible" 
-      :footer="null" 
-      centered
-      :closable="false"
-      :width="680"
-      destroyOnClose
-    >
-      <ExportImgDialog @close="exportImgDialogVisible = false"/>
-    </Modal>
-
-    <FullscreenSpin :loading="exporting" tip="正在导出..." />
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref } from 'vue'
+<script lang="ts" setup>
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '@/store'
 import useScreening from '@/hooks/useScreening'
@@ -90,59 +88,30 @@ import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import useExport from '@/hooks/useExport'
 
 import HotkeyDoc from './HotkeyDoc.vue'
-import ExportImgDialog from './ExportImgDialog.vue'
 
-export default defineComponent({
-  name: 'editor-header',
-  components: {
-    HotkeyDoc,
-    ExportImgDialog,
-  },
-  setup() {
-    const mainStore = useMainStore()
-    const { showGridLines, showRuler } = storeToRefs(mainStore)
+const mainStore = useMainStore()
+const { gridLineSize, showRuler } = storeToRefs(mainStore)
 
-    const { enterScreening, enterScreeningFromStart } = useScreening()
-    const { createSlide, deleteSlide, resetSlides } = useSlideHandler()
-    const { redo, undo } = useHistorySnapshot()
-    const { exporting, exportJSON, exportPPTX } = useExport()
+const { enterScreening, enterScreeningFromStart } = useScreening()
+const { createSlide, deleteSlide, resetSlides } = useSlideHandler()
+const { redo, undo } = useHistorySnapshot()
+const { importSpecificFile } = useExport()
 
-    const toggleGridLines = () => {
-      mainStore.setGridLinesState(!showGridLines.value)
-    }
+const setDialogForExport = mainStore.setDialogForExport
 
-    const toggleRuler = () => {
-      mainStore.setRulerState(!showRuler.value)
-    }
+const toggleGridLines = () => {
+  mainStore.setGridLineSize(gridLineSize.value ? 0 : 50)
+}
 
-    const hotkeyDrawerVisible = ref(false)
-    const exportImgDialogVisible = ref(false)
+const toggleRuler = () => {
+  mainStore.setRulerState(!showRuler.value)
+}
 
-    const goIssues = () => {
-      window.open('https://github.com/pipipi-pikachu/PPTist/issues')
-    }
+const hotkeyDrawerVisible = ref(false)
 
-    return {
-      redo,
-      undo,
-      showGridLines,
-      showRuler,
-      hotkeyDrawerVisible,
-      exportImgDialogVisible,
-      exporting,
-      enterScreening,
-      enterScreeningFromStart,
-      createSlide,
-      deleteSlide,
-      toggleGridLines,
-      toggleRuler,
-      resetSlides,
-      exportJSON,
-      exportPPTX,
-      goIssues,
-    }
-  },
-})
+const goIssues = () => {
+  window.open('https://github.com/pipipi-pikachu/PPTist/issues')
+}
 </script>
 
 <style lang="scss" scoped>

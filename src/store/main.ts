@@ -1,6 +1,8 @@
+import { customAlphabet } from 'nanoid'
 import { defineStore } from 'pinia'
 import { CreatingElement } from '@/types/edit'
 import { ToolbarStates } from '@/types/toolbar'
+import { DialogForExportTypes } from '@/types/export'
 import { SYS_FONTS } from '@/configs/font'
 import { TextAttrs, defaultRichTextAttrs } from '@/utils/prosemirror/utils'
 import { isSupportFont } from '@/utils/font'
@@ -8,26 +10,31 @@ import { isSupportFont } from '@/utils/font'
 import { useSlidesStore } from './slides'
 
 export interface MainState {
-  activeElementIdList: string[];
-  handleElementId: string;
-  activeGroupElementId: string;
-  canvasPercentage: number;
-  canvasScale: number;
-  canvasDragged: boolean;
-  thumbnailsFocus: boolean;
-  editorAreaFocus: boolean;
-  disableHotkeys: boolean;
-  showGridLines: boolean;
-  showRuler: boolean;
-  creatingElement: CreatingElement | null;
-  availableFonts: typeof SYS_FONTS;
-  toolbarState: ToolbarStates;
-  clipingImageElementId: string;
-  isScaling: boolean;
-  richTextAttrs: TextAttrs;
-  selectedTableCells: string[];
-  selectedSlidesIndex: number[];
+  activeElementIdList: string[]
+  handleElementId: string
+  activeGroupElementId: string
+  canvasPercentage: number
+  canvasScale: number
+  canvasDragged: boolean
+  thumbnailsFocus: boolean
+  editorAreaFocus: boolean
+  disableHotkeys: boolean
+  gridLineSize: number
+  showRuler: boolean
+  creatingElement: CreatingElement | null
+  availableFonts: typeof SYS_FONTS
+  toolbarState: ToolbarStates
+  clipingImageElementId: string
+  isScaling: boolean
+  richTextAttrs: TextAttrs
+  selectedTableCells: string[]
+  selectedSlidesIndex: number[]
+  dialogForExport: DialogForExportTypes
+  databaseId: string
 }
+
+const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
+export const databaseId = nanoid(10)
 
 export const useMainStore = defineStore('main', {
   state: (): MainState => ({
@@ -40,7 +47,7 @@ export const useMainStore = defineStore('main', {
     thumbnailsFocus: false, // 左侧导航缩略图区域聚焦
     editorAreaFocus: false, //  编辑区域聚焦
     disableHotkeys: false, // 禁用快捷键
-    showGridLines: false, // 显示网格线
+    gridLineSize: 0, // 网格线尺寸（0表示不显示网格线）
     showRuler: false, // 显示标尺
     creatingElement: null, // 正在插入的元素信息，需要通过绘制插入的元素（文字、形状、线条）
     availableFonts: SYS_FONTS, // 当前环境可用字体
@@ -50,6 +57,8 @@ export const useMainStore = defineStore('main', {
     selectedTableCells: [], // 选中的表格单元格
     isScaling: false, // 正在进行元素缩放
     selectedSlidesIndex: [], // 当前被选中的页面索引集合
+    dialogForExport: '', // 导出面板
+    databaseId, // 标识当前应用的indexedDB数据库ID
   }),
 
   getters: {
@@ -108,8 +117,8 @@ export const useMainStore = defineStore('main', {
       this.disableHotkeys = disable
     },
   
-    setGridLinesState(show: boolean) {
-      this.showGridLines = show
+    setGridLineSize(size: number) {
+      this.gridLineSize = size
     },
   
     setRulerState(show: boolean) {
@@ -146,6 +155,10 @@ export const useMainStore = defineStore('main', {
     
     updateSelectedSlidesIndex(selectedSlidesIndex: number[]) {
       this.selectedSlidesIndex = selectedSlidesIndex
+    },
+
+    setDialogForExport(type: DialogForExportTypes) {
+      this.dialogForExport = type
     },
   },
 })

@@ -13,54 +13,39 @@
   </svg>
 </template>
 
-<script lang="ts">
-import { defineComponent, computed } from 'vue'
+<script lang="ts" setup>
+import { computed } from 'vue'
 import tinycolor from 'tinycolor2'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import { VIEWPORT_SIZE } from '@/configs/canvas'
 import { SlideBackground } from '@/types/slides'
 
-export default defineComponent({
-  name: 'grid-lines',
-  setup() {
-    const { canvasScale } = storeToRefs(useMainStore())
-    const { currentSlide, viewportRatio } = storeToRefs(useSlidesStore())
+const { canvasScale, gridLineSize } = storeToRefs(useMainStore())
+const { currentSlide, viewportRatio } = storeToRefs(useSlidesStore())
 
-    const background = computed<SlideBackground | undefined>(() => currentSlide.value?.background)
+const background = computed<SlideBackground | undefined>(() => currentSlide.value?.background)
 
-    // 计算网格线的颜色，避免与背景的颜色太接近
-    const gridColor = computed(() => {
-      const bgColor = background.value?.color || '#fff'
-      const colorList = ['#000', '#fff']
-      return tinycolor.mostReadable(bgColor, colorList, { includeFallbackColors: true }).setAlpha(.5).toRgbString()
-    })
+// 计算网格线的颜色，避免与背景的颜色太接近
+const gridColor = computed(() => {
+  const bgColor = background.value?.color || '#fff'
+  const colorList = ['#000', '#fff']
+  return tinycolor.mostReadable(bgColor, colorList, { includeFallbackColors: true }).setAlpha(.5).toRgbString()
+})
 
-    const gridSize = 50
+// 网格路径
+const path = computed(() => {
+  const maxX = VIEWPORT_SIZE
+  const maxY = VIEWPORT_SIZE * viewportRatio.value
 
-    // 计算网格路径
-    const getPath = () => {
-      const maxX = VIEWPORT_SIZE
-      const maxY = VIEWPORT_SIZE * viewportRatio.value
-
-      let path = ''
-      for (let i = 0; i <= Math.floor(maxY / gridSize); i++) {
-        path += `M0 ${i * gridSize} L${maxX} ${i * gridSize} `
-      }
-      for (let i = 0; i <= Math.floor(maxX / gridSize); i++) {
-        path += `M${i * gridSize} 0 L${i * gridSize} ${maxY} `
-      }
-      return path
-    }
-
-    return {
-      canvasScale,
-      gridColor,
-      width: VIEWPORT_SIZE,
-      height: VIEWPORT_SIZE * viewportRatio.value,
-      path: getPath(),
-    }
-  },
+  let p = ''
+  for (let i = 0; i <= Math.floor(maxY / gridLineSize.value); i++) {
+    p += `M0 ${i * gridLineSize.value} L${maxX} ${i * gridLineSize.value} `
+  }
+  for (let i = 0; i <= Math.floor(maxX / gridLineSize.value); i++) {
+    p += `M${i * gridLineSize.value} 0 L${i * gridLineSize.value} ${maxY} `
+  }
+  return p
 })
 </script>
 

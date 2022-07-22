@@ -48,7 +48,7 @@ export default () => {
   const { moveElement } = useMoveElement()
   const { orderElement } = useOrderElement()
   const { redo, undo } = useHistorySnapshot()
-  const { enterScreening } = useScreening()
+  const { enterScreening, enterScreeningFromStart } = useScreening()
   const { scaleCanvas, resetCanvas } = useScaleCanvas()
 
   const copy = () => {
@@ -95,6 +95,11 @@ export default () => {
     else if (key === KEYS.UP || key === KEYS.DOWN) updateSlideIndex(key)
   }
 
+  const moveSlide = (key: string) => {
+    if (key === KEYS.PAGEUP) updateSlideIndex(KEYS.UP)
+    else if (key === KEYS.PAGEDOWN) updateSlideIndex(KEYS.DOWN)
+  }
+
   const order = (command: ElementOrderCommands) => {
     if (!handleElement.value) return
     orderElement(handleElement.value, command)
@@ -129,10 +134,22 @@ export default () => {
     if (shiftKey && !shiftKeyState.value) keyboardStore.setShiftKeyState(true)
     if (!disableHotkeys.value && key === KEYS.SPACE) keyboardStore.setSpaceKeyState(true)
 
-    if (ctrlOrMetaKeyActive && key === KEYS.F) {
+    
+    if (ctrlOrMetaKeyActive && key === KEYS.P) {
+      e.preventDefault()
+      mainStore.setDialogForExport('pdf')
+      return
+    }
+    if (shiftKey && key === KEYS.F5) {
       e.preventDefault()
       enterScreening()
-      keyboardStore.setCtrlKeyState(false)
+      keyboardStore.setShiftKeyState(false)
+      return
+    }
+    if (key === KEYS.F5) {
+      e.preventDefault()
+      enterScreeningFromStart()
+      return
     }
     
     if (!editorAreaFocus.value && !thumbnailsFocus.value) return      
@@ -216,6 +233,16 @@ export default () => {
       if (disableHotkeys.value) return
       e.preventDefault()
       move(KEYS.RIGHT)
+    }
+    if (key === KEYS.PAGEUP) {
+      if (disableHotkeys.value) return
+      e.preventDefault()
+      moveSlide(KEYS.PAGEUP)
+    }
+    if (key === KEYS.PAGEDOWN) {
+      if (disableHotkeys.value) return
+      e.preventDefault()
+      moveSlide(KEYS.PAGEDOWN)
     }
     if (key === KEYS.ENTER) {
       if (disableHotkeys.value) return

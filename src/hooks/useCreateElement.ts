@@ -10,17 +10,17 @@ import { CHART_TYPES } from '@/configs/chartTypes'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 
 interface CommonElementPosition {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
+  top: number
+  left: number
+  width: number
+  height: number
 }
 
 interface LineElementPosition {
-  top: number;
-  left: number;
-  start: [number, number];
-  end: [number, number];
+  top: number
+  left: number
+  start: [number, number]
+  end: [number, number]
 }
 
 export default () => {
@@ -32,7 +32,7 @@ export default () => {
   const { addHistorySnapshot } = useHistorySnapshot()
 
   // 创建（插入）一个元素并将其设置为被选中元素
-  const createElement = (element: PPTElement) => {
+  const createElement = (element: PPTElement, callback?: () => void) => {
     slidesStore.addElement(element)
     mainStore.setActiveElementIdList([element.id])
 
@@ -41,6 +41,8 @@ export default () => {
     setTimeout(() => {
       mainStore.setEditorareaFocus(true)
     }, 0)
+
+    if (callback) callback()
 
     addHistorySnapshot()
   }
@@ -170,11 +172,12 @@ export default () => {
    * @param position 位置大小信息
    * @param content 文本内容
    */
-  const createTextElement = (position: CommonElementPosition, content = '请输入内容') => {
+  const createTextElement = (position: CommonElementPosition, content = '') => {
     const { left, top, width, height } = position
+    const id = nanoid(10)
     createElement({
       type: 'text',
-      id: nanoid(10),
+      id,
       left, 
       top, 
       width, 
@@ -183,6 +186,11 @@ export default () => {
       rotate: 0,
       defaultFontName: theme.value.fontName,
       defaultColor: theme.value.fontColor,
+    }, () => {
+      setTimeout(() => {
+        const editorRef: HTMLElement | null = document.querySelector(`#editable-element-${id} .ProseMirror`)
+        if (editorRef) editorRef.focus()
+      }, 0)
     })
   }
   
@@ -210,7 +218,13 @@ export default () => {
     if (data.pathFormula) {
       newElement.pathFormula = data.pathFormula
       newElement.viewBox = [width, height]
-      newElement.path = SHAPE_PATH_FORMULAS[data.pathFormula](width, height)
+
+      const pathFormula = SHAPE_PATH_FORMULAS[data.pathFormula]
+      if ('editable' in pathFormula) {
+        newElement.path = pathFormula.formula(width, height, pathFormula.defaultValue)
+        newElement.keypoint = pathFormula.defaultValue
+      }
+      else newElement.path = pathFormula.formula(width, height)
     }
     createElement(newElement)
   }

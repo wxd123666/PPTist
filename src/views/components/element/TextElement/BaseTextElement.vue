@@ -28,39 +28,37 @@
           :height="elementInfo.height"
           :outline="elementInfo.outline"
         />
-        <div class="text ProseMirror-static" v-html="elementInfo.content"></div>
+        <div 
+          class="text ProseMirror-static" 
+          :style="cssVar"
+          v-html="elementInfo.content"
+        ></div>
       </div>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, PropType, computed } from 'vue'
+<script lang="ts" setup>
+import { PropType, computed, StyleValue } from 'vue'
 import { PPTTextElement } from '@/types/slides'
 import ElementOutline from '@/views/components/element/ElementOutline.vue'
 
 import useElementShadow from '@/views/components/element/hooks/useElementShadow'
 
-export default defineComponent({
-  name: 'base-element-text',
-  components: {
-    ElementOutline,
-  },
-  props: {
-    elementInfo: {
-      type: Object as PropType<PPTTextElement>,
-      required: true,
-    },
-  },
-  setup(props) {
-    const shadow = computed(() => props.elementInfo.shadow)
-    const { shadowStyle } = useElementShadow(shadow)
-
-    return {
-      shadowStyle,
-    }
+const props = defineProps({
+  elementInfo: {
+    type: Object as PropType<PPTTextElement>,
+    required: true,
   },
 })
+
+const shadow = computed(() => props.elementInfo.shadow)
+const { shadowStyle } = useElementShadow(shadow)
+
+const cssVar = computed(() => ({
+  '--textIndent': `${props.elementInfo.textIndent || 0}px`,
+  '--paragraphSpace': `${props.elementInfo.paragraphSpace === undefined ? 5 : props.elementInfo.paragraphSpace}px`,
+} as StyleValue))
 </script>
 
 <style lang="scss" scoped>

@@ -16,6 +16,7 @@
         class="element-content" 
         v-contextmenu="contextmenus" 
         @mousedown="$event => handleSelectElement($event, false)"
+        @touchstart="$event => handleSelectElement($event, false)"
       >
         <VideoPlayer
           :width="elementInfo.width"
@@ -29,14 +30,15 @@
           v-for="item in ['t', 'b', 'l', 'r']" 
           :key="item"
           @mousedown="$event => handleSelectElement($event)"
+          @touchstart="$event => handleSelectElement($event)"
         ></div>
       </div>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, PropType } from 'vue'
+<script lang="ts" setup>
+import { PropType } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '@/store'
 import { PPTVideoElement } from '@/types/slides'
@@ -44,40 +46,28 @@ import { ContextmenuItem } from '@/components/Contextmenu/types'
 
 import VideoPlayer from './VideoPlayer/index.vue'
 
-export default defineComponent({
-  name: 'editable-element-video',
-  components: {
-    VideoPlayer,
+const props = defineProps({
+  elementInfo: {
+    type: Object as PropType<PPTVideoElement>,
+    required: true,
   },
-  props: {
-    elementInfo: {
-      type: Object as PropType<PPTVideoElement>,
-      required: true,
-    },
-    selectElement: {
-      type: Function as PropType<(e: MouseEvent, element: PPTVideoElement, canMove?: boolean) => void>,
-      required: true,
-    },
-    contextmenus: {
-      type: Function as PropType<() => ContextmenuItem[]>,
-    },
+  selectElement: {
+    type: Function as PropType<(e: MouseEvent | TouchEvent, element: PPTVideoElement, canMove?: boolean) => void>,
+    required: true,
   },
-  setup(props) {
-    const { canvasScale } = storeToRefs(useMainStore())
-
-    const handleSelectElement = (e: MouseEvent, canMove = true) => {
-      if (props.elementInfo.lock) return
-      e.stopPropagation()
-
-      props.selectElement(e, props.elementInfo, canMove)
-    }
-
-    return {
-      canvasScale,
-      handleSelectElement,
-    }
+  contextmenus: {
+    type: Function as PropType<() => ContextmenuItem[] | null>,
   },
 })
+
+const { canvasScale } = storeToRefs(useMainStore())
+
+const handleSelectElement = (e: MouseEvent | TouchEvent, canMove = true) => {
+  if (props.elementInfo.lock) return
+  e.stopPropagation()
+
+  props.selectElement(e, props.elementInfo, canMove)
+}
 </script>
 
 <style lang="scss" scoped>

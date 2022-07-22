@@ -9,11 +9,11 @@
       <Popover trigger="click">
         <template #content>
           <ColorPicker
-            :modelValue="handleElement.color"
+            :modelValue="handleLatexElement.color"
             @update:modelValue="value => updateLatex({ color: value })"
           />
         </template>
-        <ColorButton :color="handleElement.color" style="flex: 3;" />
+        <ColorButton :color="handleLatexElement.color" style="flex: 3;" />
       </Popover>
     </div>
     <div class="row">
@@ -21,8 +21,8 @@
       <InputNumber 
         :min="1"
         :max="3"
-        :value="handleElement.strokeWidth" 
-        @change="value => updateLatex({ strokeWidth: value })" 
+        :value="handleLatexElement.strokeWidth" 
+        @change="value => updateLatex({ strokeWidth: value as number })" 
         style="flex: 3;" 
       />
     </div>
@@ -35,7 +35,7 @@
       destroyOnClose
     >
       <LaTeXEditor 
-        :value="handleElement.latex"
+        :value="handleLatexElement.latex"
         @close="latexEditorVisible = false"
         @update="data => { updateLatexData(data); latexEditorVisible = false }"
       />
@@ -43,8 +43,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, onUnmounted, ref } from 'vue'
+<script lang="ts" setup>
+import { onUnmounted, Ref, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import { PPTLatexElement } from '@/types/slides'
@@ -54,50 +54,36 @@ import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import ColorButton from '../common/ColorButton.vue'
 import LaTeXEditor from '@/components/LaTeXEditor/index.vue'
 
-export default defineComponent({
-  name: 'latex-style-panel',
-  components: {
-    ColorButton,
-    LaTeXEditor,
-  },
-  setup() {
-    const slidesStore = useSlidesStore()
-    const { handleElement } = storeToRefs(useMainStore())
+const slidesStore = useSlidesStore()
+const { handleElement } = storeToRefs(useMainStore())
 
-    const latexEditorVisible = ref(false)
+const handleLatexElement = handleElement as Ref<PPTLatexElement>
 
-    const { addHistorySnapshot } = useHistorySnapshot()
+const latexEditorVisible = ref(false)
 
-    const updateLatex = (props: Partial<PPTLatexElement>) => {
-      if (!handleElement.value) return
-      slidesStore.updateElement({ id: handleElement.value.id, props })
-      addHistorySnapshot()
-    }
+const { addHistorySnapshot } = useHistorySnapshot()
 
-    const updateLatexData = (data: { path: string; latex: string; w: number; h: number; }) => {
-      updateLatex({
-        path: data.path,
-        latex: data.latex,
-        width: data.w,
-        height: data.h,
-        viewBox: [data.w, data.h],
-      })
-    }
+const updateLatex = (props: Partial<PPTLatexElement>) => {
+  if (!handleElement.value) return
+  slidesStore.updateElement({ id: handleElement.value.id, props })
+  addHistorySnapshot()
+}
 
-    const openLatexEditor = () => latexEditorVisible.value = true
+const updateLatexData = (data: { path: string; latex: string; w: number; h: number; }) => {
+  updateLatex({
+    path: data.path,
+    latex: data.latex,
+    width: data.w,
+    height: data.h,
+    viewBox: [data.w, data.h],
+  })
+}
 
-    emitter.on(EmitterEvents.OPEN_LATEX_EDITOR, openLatexEditor)
-    onUnmounted(() => {
-      emitter.off(EmitterEvents.OPEN_LATEX_EDITOR, openLatexEditor)
-    })
+const openLatexEditor = () => latexEditorVisible.value = true
 
-    return {
-      handleElement,
-      latexEditorVisible,
-      updateLatex,
-      updateLatexData,
-    }
-  }
+emitter.on(EmitterEvents.OPEN_LATEX_EDITOR, openLatexEditor)
+onUnmounted(() => {
+  emitter.off(EmitterEvents.OPEN_LATEX_EDITOR, openLatexEditor)
 })
 </script>
 

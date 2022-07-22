@@ -160,11 +160,11 @@ export const getAttrValueInSelection = (view: EditorView, attr: string) => {
 }
 
 interface DefaultAttrs {
-  color?: string;
-  backcolor?: string;
-  fontsize?: string;
-  fontname?: string;
-  align?: string;
+  color?: string
+  backcolor?: string
+  fontsize?: string
+  fontname?: string
+  align?: string
 }
 const _defaultAttrs: DefaultAttrs = {
   color: '#000',
@@ -216,6 +216,12 @@ export const getTextAttrs = (view: EditorView, defaultAttrs: DefaultAttrs = {}) 
 }
 
 export type TextAttrs = ReturnType<typeof getTextAttrs>
+
+export const getFontsize = (view: EditorView) => {
+  const marks = getMarkAttrs(view)
+  const fontsize = getAttrValue(marks, 'fontsize', 'fontsize') || _defaultAttrs.fontsize
+  return parseInt(fontsize)
+}
 
 export const defaultRichTextAttrs: TextAttrs = {
   bold: false,

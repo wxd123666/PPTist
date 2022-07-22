@@ -1,6 +1,6 @@
 <template>
   <div class="shape-pool">
-    <div class="category" v-for="item in shapeList" :key="item.type">
+    <div class="category" v-for="item in SHAPE_LIST" :key="item.type">
       <div class="category-name">{{item.type}}</div>
       <div class="shape-list">
         <div class="shape-item" v-for="(shape, index) in item.children" :key="index">
@@ -15,11 +15,12 @@
               >
                 <path 
                   class="shape-path"
+                  :class="{ 'outlined': shape.outlined }"
                   vector-effect="non-scaling-stroke" 
                   stroke-linecap="butt" 
                   stroke-miterlimit="8"
-                  fill="transparent"
-                  stroke="#999"
+                  :fill="shape.outlined ? '#999' : 'transparent'"
+                  :stroke="shape.outlined ? 'transparent' : '#999'"
                   stroke-width="2" 
                   :d="shape.path"
                 ></path>
@@ -32,36 +33,28 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent } from 'vue'
+<script lang="ts" setup>
 import { SHAPE_LIST, ShapePoolItem } from '@/configs/shapes'
 
-export default defineComponent({
-  name: 'shape-pool',
-  emits: ['select'],
-  setup(props, { emit }) {
-    const shapeList = SHAPE_LIST
+const emit = defineEmits<{
+  (event: 'select', payload: ShapePoolItem): void
+}>()
 
-    const selectShape = (shape: ShapePoolItem) => {
-      emit('select', shape)
-    }
-
-    return {
-      shapeList,
-      selectShape,
-    }
-  },
-})
+const selectShape = (shape: ShapePoolItem) => {
+  emit('select', shape)
+}
 </script>
 
 <style lang="scss" scoped>
 .shape-pool {
   width: 340px;
-  max-height: 550px;
+  max-height: 520px;
   overflow: auto;
+  margin-top: -12px;
   margin-bottom: -12px;
   margin-right: -12px;
   padding-right: 12px;
+  padding-top: 12px;
 }
 .category-name {
   width: 100%;
@@ -93,7 +86,12 @@ export default defineComponent({
   align-items: center;
 
   &:hover .shape-path {
-    stroke: $themeColor;
+    &:not(.outlined) {
+      stroke: $themeColor;
+    }
+    &.outlined {
+      fill: $themeColor;
+    }
   }
 
   svg:not(:root) {
